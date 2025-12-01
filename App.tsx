@@ -1,20 +1,44 @@
+import React from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Provider } from 'react-redux';
+import { PersistGate } from 'redux-persist/integration/react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { store, persistor } from './src/store/store';
+import { RootNavigator } from './src/navigation/RootNavigator';
+import { ActivityIndicator, View, StyleSheet } from 'react-native';
+import { colors } from './src/theme';
 
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <GestureHandlerRootView style={styles.container}>
+      <Provider store={store}>
+        <PersistGate
+          loading={
+            <View style={styles.loading}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          }
+          persistor={persistor}
+        >
+          <SafeAreaProvider>
+            <RootNavigator />
+            <StatusBar style="dark" />
+          </SafeAreaProvider>
+        </PersistGate>
+      </Provider>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
+  },
+  loading: {
+    flex: 1,
     justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.background,
   },
 });
