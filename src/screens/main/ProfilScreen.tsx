@@ -13,8 +13,20 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MainStackParamList } from '@/navigation/types';
 import { colors, typography, spacing } from '@/theme';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { logout } from '@/store/slices/authSlice';
+import { logout, setUser } from '@/store/slices/authSlice';
 import { QRScanner } from '@/components/QRScanner';
+import treasureHuntService from '@/services/treasure-hunt.service';
+import userService from '@/services/user.service';
+import { Platform } from 'react-native';
+
+let Location: any = null;
+if (Platform.OS !== 'web') {
+  try {
+    Location = require('expo-location');
+  } catch (e) {
+    console.warn('expo-location not available');
+  }
+}
 
 type ProfilScreenNavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
@@ -42,14 +54,51 @@ export const ProfilScreen: React.FC = () => {
     );
   };
 
-  const handleQRScan = (data: string) => {
+  const handleQRScan = async (data: string) => {
     setShowQRScanner(false);
-    Alert.alert(
-      'QR Code scanné',
-      `Code détecté : ${data}\n\nVérification en cours...`,
-      [{ text: 'OK' }]
-    );
-    // TODO: Validate QR code with backend
+    
+    try {
+      // 1. Get Location
+      let latitude = 0;
+      let longitude = 0;
+
+      if (Platform.OS !== 'web' && Location) {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const location = await Location.getCurrentPositionAsync({});
+          latitude = location.coords.latitude;
+          longitude = location.coords.longitude;
+        } else {
+          Alert.alert('Permission requise', 'La localisation est nécessaire pour valider le trésor.');
+          return;
+        }
+      }
+
+      // 2. Call API
+      const result = await treasureHuntService.recordFound({
+        qrCode: data,
+        latitude,
+        longitude
+      });
+
+      // 3. Show Success
+      Alert.alert(
+        'Trésor trouvé ! 🎉',
+        `${result.message}\n\n+${result.pointsEarned} points`,
+        [{ text: 'Génial !' }]
+      );
+      
+      // 4. Refresh user profile to update points
+      const updatedUser = await userService.getProfile();
+      dispatch(setUser(updatedUser));
+      
+    } catch (error: any) {
+      Alert.alert(
+        'Erreur',
+        error.message || 'Impossible de valider le QR code.',
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   if (!user) {
