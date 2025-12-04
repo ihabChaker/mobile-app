@@ -13,6 +13,8 @@ export interface Parcours {
   startPoint: Coordinates;
   endPoint: Coordinates;
   gpxData?: string;
+  gpxFileUrl?: string;
+  geoJsonPath?: string;
   thumbnailUrl?: string;
   isActive: boolean;
   createdAt: string;

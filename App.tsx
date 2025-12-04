@@ -8,26 +8,29 @@ import { store, persistor } from './src/store/store';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { colors } from './src/theme';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
 
 export default function App() {
   return (
-    <GestureHandlerRootView style={styles.container}>
-      <Provider store={store}>
-        <PersistGate
-          loading={
-            <View style={styles.loading}>
-              <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-          }
-          persistor={persistor}
-        >
-          <SafeAreaProvider>
-            <RootNavigator />
-            <StatusBar style="dark" />
-          </SafeAreaProvider>
-        </PersistGate>
-      </Provider>
-    </GestureHandlerRootView>
+    <ErrorBoundary>
+      <GestureHandlerRootView style={styles.container}>
+        <Provider store={store}>
+          <PersistGate
+            loading={
+              <View style={styles.loading}>
+                <ActivityIndicator size="large" color={colors.primary} />
+              </View>
+            }
+            persistor={persistor}
+          >
+            <SafeAreaProvider>
+              <RootNavigator />
+              <StatusBar style="dark" />
+            </SafeAreaProvider>
+          </PersistGate>
+        </Provider>
+      </GestureHandlerRootView>
+    </ErrorBoundary>
   );
 }
 

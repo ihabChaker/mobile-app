@@ -6,7 +6,9 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  TouchableOpacity,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, typography, spacing } from '@/theme';
 import parcoursService from '@/services/parcours.service';
 import poiService from '@/services/poi.service';
@@ -15,6 +17,7 @@ import { Parcours, POI } from '@/types/parcours.types';
 // Import conditionnel pour éviter les erreurs web
 let MapView: any = null;
 let Marker: any = null;
+let Polyline: any = null;
 let PROVIDER_GOOGLE: any = null;
 let Location: any = null;
 
@@ -22,6 +25,7 @@ if (Platform.OS !== 'web') {
   const Maps = require('react-native-maps');
   MapView = Maps.default;
   Marker = Maps.Marker;
+  Polyline = Maps.Polyline;
   PROVIDER_GOOGLE = Maps.PROVIDER_GOOGLE;
   Location = require('expo-location');
 }
@@ -30,12 +34,38 @@ if (Platform.OS !== 'web') {
  * Écran Carte Interactive
  */
 export const CarteScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const [location, setLocation] = useState<any>(null);
   const [parcours, setParcours] = useState<Parcours[]>([]);
   const [pois, setPois] = useState<POI[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasLocationPermission, setHasLocationPermission] = useState(false);
   const [showPOIs, setShowPOIs] = useState(true);
+  const [showGPXPaths, setShowGPXPaths] = useState(true);
+
+  /**
+   * Parse GeoJSON string to extract coordinates for Polyline
+   */
+  const parseGeoJSON = (geoJsonPath?: string): Array<{latitude: number, longitude: number}> => {
+    if (!geoJsonPath) return [];
+    
+    try {
+      const geoJson = JSON.parse(geoJsonPath);
+      
+      // GeoJSON LineString format: { type: "LineString", coordinates: [[lon, lat], [lon, lat], ...] }
+      if (geoJson.type === 'LineString' && Array.isArray(geoJson.coordinates)) {
+        return geoJson.coordinates.map((coord: [number, number]) => ({
+          longitude: coord[0],
+          latitude: coord[1],
+        }));
+      }
+      
+      return [];
+    } catch (error) {
+      console.error('Error parsing GeoJSON:', error);
+      return [];
+    }
+  };
 
   useEffect(() => {
     if (Platform.OS === 'web') {
@@ -64,11 +94,11 @@ export const CarteScreen: React.FC = () => {
 
         // Charger les parcours
         const parcoursData = await parcoursService.getParcours();
-        setParcours(parcoursData);
+        setParcours(parcoursData || []);
 
         // Charger les POIs pour tous les parcours
         const allPois: POI[] = [];
-        for (const p of parcoursData) {
+        for (const p of (parcoursData || [])) {
           try {
             const parcoursPois = await poiService.getPOIsByParcours(p.id);
             allPois.push(...parcoursPois);
@@ -88,7 +118,7 @@ export const CarteScreen: React.FC = () => {
   // Message pour la version web
   if (Platform.OS === 'web') {
     return (
-      <View style={styles.webContainer}>
+      <View style={[styles.webContainer, { paddingTop: insets.top }]}>
         <Text style={styles.webIcon}>🗺️</Text>
         <Text style={styles.webTitle}>Carte Interactive</Text>
         <Text style={styles.webText}>
@@ -103,7 +133,7 @@ export const CarteScreen: React.FC = () => {
 
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[styles.loadingContainer, { paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Chargement de la carte...</Text>
       </View>
@@ -138,6 +168,31 @@ export const CarteScreen: React.FC = () => {
         showsCompass
         showsScale
       >
+        {/* GPX Path Polylines */}
+        {showGPXPaths && parcours.map(item => {
+          const pathCoordinates = parseGeoJSON(item.geoJsonPath);
+          
+          if (pathCoordinates.length < 2) return null;
+
+          // Color based on difficulty
+          const pathColor = {
+            facile: colors.success,
+            moyen: colors.warning,
+            difficile: colors.error,
+          }[item.difficulty] || colors.primary;
+
+          return (
+            <Polyline
+              key={`path-${item.id}`}
+              coordinates={pathCoordinates}
+              strokeColor={pathColor}
+              strokeWidth={3}
+              lineCap="round"
+              lineJoin="round"
+            />
+          );
+        })}
+
         {/* Marqueurs de parcours */}
         {parcours.map(item => {
           // Utiliser les coordonnées du point de départ
@@ -208,6 +263,31 @@ export const CarteScreen: React.FC = () => {
                 <Text style={styles.legendItem}>📍 Points d'intérêt</Text>
               </View>
             )}
+            
+            {/* Toggle buttons */}
+            <View style={styles.toggleContainer}>
+              {parcours.some(p => p.geoJsonPath) && (
+                <TouchableOpacity
+                  style={[styles.toggleButton, showGPXPaths && styles.toggleButtonActive]}
+                  onPress={() => setShowGPXPaths(!showGPXPaths)}
+                >
+                  <Text style={[styles.toggleButtonText, showGPXPaths && styles.toggleButtonTextActive]}>
+                    {showGPXPaths ? '✓' : ''} Chemins
+                  </Text>
+                </TouchableOpacity>
+              )}
+              
+              {pois.length > 0 && (
+                <TouchableOpacity
+                  style={[styles.toggleButton, showPOIs && styles.toggleButtonActive]}
+                  onPress={() => setShowPOIs(!showPOIs)}
+                >
+                  <Text style={[styles.toggleButtonText, showPOIs && styles.toggleButtonTextActive]}>
+                    {showPOIs ? '✓' : ''} POIs
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         </View>
       )}
@@ -335,5 +415,32 @@ const styles = StyleSheet.create({
     ...typography.bodyMedium,
     color: colors.gray600,
     textAlign: 'center',
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    marginTop: spacing.sm,
+    gap: spacing.sm,
+  },
+  toggleButton: {
+    flex: 1,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: 8,
+    backgroundColor: colors.gray200,
+    borderWidth: 1,
+    borderColor: colors.gray300,
+    alignItems: 'center',
+  },
+  toggleButtonActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  toggleButtonText: {
+    ...typography.bodySmall,
+    color: colors.gray600,
+    fontWeight: '500',
+  },
+  toggleButtonTextActive: {
+    color: colors.surface,
   },
 });

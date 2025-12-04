@@ -9,6 +9,7 @@ import {
   Alert,
   Image,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, typography, spacing } from '@/theme';
 import rewardService from '@/services/reward.service';
 import { UserBadge, UserChallenge } from '@/services/reward.service';
@@ -18,8 +19,10 @@ import { UserBadge, UserChallenge } from '@/services/reward.service';
  * Affiche les badges et challenges de l'utilisateur
  */
 export const RewardsScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const [badges, setBadges] = useState<UserBadge[]>([]);
   const [challenges, setChallenges] = useState<UserChallenge[]>([]);
+  const [availableChallenges, setAvailableChallenges] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'badges' | 'challenges'>('badges');
 
@@ -30,16 +33,28 @@ export const RewardsScreen: React.FC = () => {
   const loadRewards = async () => {
     try {
       setIsLoading(true);
-      const [badgesData, challengesData] = await Promise.all([
+      const [badgesData, challengesData, availableData] = await Promise.all([
         rewardService.getMyBadges(),
         rewardService.getMyChallenges(),
+        rewardService.getActiveChallenges(),
       ]);
       setBadges(badgesData);
       setChallenges(challengesData);
+      setAvailableChallenges(availableData || []);
     } catch (error: any) {
       Alert.alert('Erreur', error.message || 'Impossible de charger les récompenses');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleStartChallenge = async (challengeId: number) => {
+    try {
+      await rewardService.startChallenge(challengeId);
+      Alert.alert('Succès', 'Challenge démarré avec succès !');
+      await loadRewards(); // Refresh the data
+    } catch (error: any) {
+      Alert.alert('Erreur', error.message || 'Impossible de démarrer le challenge');
     }
   };
 
@@ -110,13 +125,21 @@ export const RewardsScreen: React.FC = () => {
   };
 
   const renderChallenges = () => {
-    if (challenges.length === 0) {
+    // Get the IDs of already started challenges
+    const startedChallengeIds = challenges.map((uc) => uc.challenge.id);
+    
+    // Filter available challenges to exclude already started ones
+    const unStartedChallenges = (availableChallenges || []).filter(
+      (challenge) => !startedChallengeIds.includes(challenge.id)
+    );
+
+    if (challenges.length === 0 && unStartedChallenges.length === 0) {
       return (
         <View style={styles.emptyState}>
           <Text style={styles.emptyIcon}>🎯</Text>
-          <Text style={styles.emptyTitle}>Aucun challenge en cours</Text>
+          <Text style={styles.emptyTitle}>Aucun challenge disponible</Text>
           <Text style={styles.emptyText}>
-            Démarrez un nouveau challenge pour gagner des points !
+            Les challenges arrivent bientôt !
           </Text>
         </View>
       );
@@ -124,6 +147,7 @@ export const RewardsScreen: React.FC = () => {
 
     return (
       <View style={styles.challengesList}>
+        {/* Active/Started Challenges */}
         {challenges.map((userChallenge) => {
           const progress =
             (userChallenge.progress / userChallenge.challenge.target) * 100;
@@ -177,6 +201,46 @@ export const RewardsScreen: React.FC = () => {
             </View>
           );
         })}
+
+        {/* Available Challenges (not started) */}
+        {unStartedChallenges.map((challenge) => (
+          <View key={`available-${challenge.id}`} style={styles.challengeCard}>
+            <View style={styles.challengeHeader}>
+              <View style={styles.challengeInfo}>
+                <Text style={styles.challengeName}>{challenge.name}</Text>
+                <Text style={styles.challengeDescription}>
+                  {challenge.description}
+                </Text>
+              </View>
+              <View style={styles.newBadge}>
+                <Text style={styles.newBadgeText}>NOUVEAU</Text>
+              </View>
+            </View>
+
+            <View style={styles.challengeDetails}>
+              <Text style={styles.challengeTarget}>
+                🎯 Objectif: {challenge.target}
+              </Text>
+            </View>
+
+            <View style={styles.challengeFooter}>
+              <Text style={styles.challengeType}>
+                {getChallengeTypeIcon(challenge.type)}{' '}
+                {getChallengeTypeLabel(challenge.type)}
+              </Text>
+              <Text style={styles.challengeReward}>
+                🎁 +{challenge.reward} pts
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.startButton}
+              onPress={() => handleStartChallenge(challenge.id)}
+            >
+              <Text style={styles.startButtonText}>Démarrer le challenge</Text>
+            </TouchableOpacity>
+          </View>
+        ))}
       </View>
     );
   };
@@ -205,7 +269,7 @@ export const RewardsScreen: React.FC = () => {
 
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[styles.loadingContainer, { paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Chargement des récompenses...</Text>
       </View>
@@ -214,7 +278,7 @@ export const RewardsScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + spacing.lg }]}>
         <Text style={styles.headerTitle}>🏆 Mes Récompenses</Text>
         <Text style={styles.headerSubtitle}>
           {badges.length} badge{badges.length > 1 ? 's' : ''} • {challenges.length}{' '}
@@ -444,6 +508,26 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontWeight: '700',
   },
+  newBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
+    backgroundColor: colors.primary,
+    borderRadius: 6,
+  },
+  newBadgeText: {
+    ...typography.caption,
+    color: colors.white,
+    fontWeight: '700',
+    fontSize: 10,
+  },
+  challengeDetails: {
+    marginBottom: spacing.sm,
+  },
+  challengeTarget: {
+    ...typography.bodySmall,
+    color: colors.text,
+    fontWeight: '600',
+  },
   progressContainer: {
     marginBottom: spacing.sm,
   },
@@ -474,6 +558,19 @@ const styles = StyleSheet.create({
   challengeReward: {
     ...typography.caption,
     color: colors.warning,
+    fontWeight: '700',
+  },
+  startButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: 8,
+    marginTop: spacing.md,
+    alignItems: 'center',
+  },
+  startButtonText: {
+    ...typography.labelLarge,
+    color: colors.white,
     fontWeight: '700',
   },
 });

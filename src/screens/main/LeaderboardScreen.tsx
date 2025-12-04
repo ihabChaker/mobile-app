@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, typography, spacing } from '@/theme';
 import rewardService from '@/services/reward.service';
 import type { LeaderboardEntry } from '@/services/reward.service';
@@ -27,6 +28,7 @@ interface LeaderboardState {
  * Phase 4 - Gamification
  */
 export const LeaderboardScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const [state, setState] = useState<LeaderboardState>({
     entries: [],
     loading: true,
@@ -223,7 +225,7 @@ export const LeaderboardScreen: React.FC = () => {
 
   if (state.loading && !state.refreshing) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[styles.loadingContainer, { paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Chargement du classement...</Text>
       </View>
@@ -238,7 +240,10 @@ export const LeaderboardScreen: React.FC = () => {
         keyExtractor={(item, index) => `${item.userId}-${index}`}
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={renderEmpty}
-        contentContainerStyle={state.entries.length === 0 && styles.emptyList}
+        contentContainerStyle={[
+          state.entries.length === 0 && styles.emptyList,
+          { paddingTop: insets.top },
+        ]}
         refreshControl={
           <RefreshControl
             refreshing={state.refreshing}

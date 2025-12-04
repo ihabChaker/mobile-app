@@ -10,6 +10,7 @@ import {
   Image,
   Modal,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, typography, spacing } from '@/theme';
 import podcastService from '@/services/podcast.service';
 import { AudioPlayer } from '@/components/AudioPlayer';
@@ -20,6 +21,7 @@ import { Podcast } from '@/types/parcours.types';
  * Liste tous les podcasts disponibles
  */
 export const PodcastScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const [podcasts, setPodcasts] = useState<Podcast[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -103,7 +105,7 @@ export const PodcastScreen: React.FC = () => {
 
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[styles.loadingContainer, { paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Chargement des podcasts...</Text>
       </View>
@@ -112,7 +114,7 @@ export const PodcastScreen: React.FC = () => {
 
   if (podcasts.length === 0) {
     return (
-      <View style={styles.emptyContainer}>
+      <View style={[styles.emptyContainer, { paddingTop: insets.top }]}>
         <Text style={styles.emptyIcon}>🎧</Text>
         <Text style={styles.emptyTitle}>Aucun podcast disponible</Text>
         <Text style={styles.emptyText}>
@@ -124,7 +126,7 @@ export const PodcastScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + spacing.lg }]}>
         <Text style={styles.headerTitle}>🎧 Podcasts Historiques</Text>
         <Text style={styles.headerSubtitle}>
           {podcasts.length} podcast{podcasts.length > 1 ? 's' : ''} disponible{podcasts.length > 1 ? 's' : ''}

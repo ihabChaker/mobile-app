@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MainStackParamList } from '@/navigation/types';
 import { colors, typography, spacing } from '@/theme';
 import { ParcoursCard } from '@/components';
@@ -23,6 +24,7 @@ type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
  */
 export const ParcoursScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
+  const insets = useSafeAreaInsets();
   const [parcours, setParcours] = useState<Parcours[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -92,7 +94,7 @@ export const ParcoursScreen: React.FC = () => {
 
   if (isLoading && !isRefreshing) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[styles.loadingContainer, { paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Chargement des parcours...</Text>
       </View>
@@ -101,7 +103,7 @@ export const ParcoursScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + spacing.lg }]}>
         <Text style={styles.title}>Parcours Disponibles</Text>
         <Text style={styles.subtitle}>
           Découvrez les sites historiques de la Normandie
@@ -111,7 +113,7 @@ export const ParcoursScreen: React.FC = () => {
       {renderError()}
 
       <FlatList
-        data={parcours}
+        data={parcours || []}
         keyExtractor={item => item.id.toString()}
         renderItem={({ item }) => (
           <ParcoursCard

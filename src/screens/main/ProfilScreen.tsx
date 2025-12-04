@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MainStackParamList } from '@/navigation/types';
 import { colors, typography, spacing } from '@/theme';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -36,6 +37,7 @@ type ProfilScreenNavigationProp = NativeStackNavigationProp<MainStackParamList>;
 export const ProfilScreen: React.FC = () => {
   const dispatch = useAppDispatch();
   const navigation = useNavigation<ProfilScreenNavigationProp>();
+  const insets = useSafeAreaInsets();
   const user = useAppSelector(state => state.auth.user);
   const [showQRScanner, setShowQRScanner] = useState(false);
 
@@ -103,7 +105,7 @@ export const ProfilScreen: React.FC = () => {
 
   if (!user) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
         <Text style={styles.errorText}>Utilisateur non connecté</Text>
       </View>
     );
@@ -116,7 +118,11 @@ export const ProfilScreen: React.FC = () => {
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView 
+      style={styles.container} 
+      contentContainerStyle={{ paddingTop: insets.top }} 
+      showsVerticalScrollIndicator={false}
+    >
       {/* Header Card */}
       <View style={styles.headerCard}>
         <View style={styles.avatarContainer}>
