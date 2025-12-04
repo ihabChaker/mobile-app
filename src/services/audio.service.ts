@@ -1,4 +1,5 @@
-import { AudioPlayer, AudioSource } from 'expo-audio';
+import type { AudioPlayer } from 'expo-audio';
+import { AudioSource } from 'expo-audio';
 
 /**
  * Service de gestion de la lecture audio pour les podcasts
@@ -7,7 +8,6 @@ import { AudioPlayer, AudioSource } from 'expo-audio';
 class AudioService {
   private player: AudioPlayer | null = null;
   private currentPodcastId: number | null = null;
-  private isPlaying: boolean = false;
 
   /**
    * Initialiser le mode audio
@@ -15,9 +15,7 @@ class AudioService {
   async initialize(): Promise<void> {
     try {
       // expo-audio gère automatiquement la configuration audio
-      if (!this.player) {
-        this.player = new AudioPlayer();
-      }
+      // Le lecteur sera créé lors du premier loadAndPlay
     } catch (error) {
       console.error('Failed to initialize audio:', error);
       throw error;
@@ -29,17 +27,21 @@ class AudioService {
    */
   async loadAndPlay(audioUrl: string, podcastId: number): Promise<void> {
     try {
-      // Créer ou réinitialiser le lecteur
-      if (!this.player) {
-        this.player = new AudioPlayer();
+      // Créer ou remplacer la source audio
+      const source: AudioSource = { uri: audioUrl };
+      
+      if (this.player) {
+        // Remplacer la source audio existante
+        await this.player.replace(source);
+      } else {
+        // Note: Dans un contexte de service singleton, nous ne pouvons pas utiliser useAudioPlayer
+        // car c'est un hook React. L'implémentation complète nécessiterait une refactorisation
+        // pour utiliser un contexte React ou une approche différente.
+        console.warn('AudioPlayer not initialized. Use within a React component with useAudioPlayer hook.');
+        return;
       }
 
-      // Remplacer la source audio
-      const source: AudioSource = { uri: audioUrl };
-      await this.player.replace(source);
-
       this.currentPodcastId = podcastId;
-      this.isPlaying = true;
 
       await this.player.play();
     } catch (error) {
@@ -49,12 +51,18 @@ class AudioService {
   }
 
   /**
+   * Définir le lecteur audio (à appeler depuis un composant React)
+   */
+  setPlayer(player: AudioPlayer): void {
+    this.player = player;
+  }
+
+  /**
    * Jouer/Reprendre la lecture
    */
   async play(): Promise<void> {
     if (this.player) {
       await this.player.play();
-      this.isPlaying = true;
     }
   }
 
@@ -64,7 +72,6 @@ class AudioService {
   async pause(): Promise<void> {
     if (this.player) {
       await this.player.pause();
-      this.isPlaying = false;
     }
   }
 
@@ -77,7 +84,6 @@ class AudioService {
       await this.player.remove();
       this.player = null;
       this.currentPodcastId = null;
-      this.isPlaying = false;
     }
   }
 
