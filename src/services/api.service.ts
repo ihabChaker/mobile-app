@@ -6,6 +6,38 @@ import { logout } from '@/store/slices/authSlice';
 const API_BASE_URL = 'https://histo-rando-backend-egvh3.ondigitalocean.app/api/v1';
 
 /**
+ * Interface pour les réponses paginées
+ */
+export interface PaginatedResponse<T> {
+  data: T[];
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  };
+}
+
+/**
+ * Utilitaire pour extraire les données d'une réponse paginée ou non
+ * Assure la rétrocompatibilité avec les anciennes réponses (tableaux directs)
+ */
+export function extractData<T>(response: T[] | PaginatedResponse<T>): T[] {
+  // Si c'est déjà un tableau, le retourner tel quel
+  if (Array.isArray(response)) {
+    return response;
+  }
+  // Si c'est une réponse paginée, extraire le tableau data
+  if (response && typeof response === 'object' && 'data' in response) {
+    return response.data;
+  }
+  // Par défaut, retourner un tableau vide
+  return [];
+}
+
+/**
  * Instance Axios configurée pour l'API HistoRando
  */
 class ApiService {

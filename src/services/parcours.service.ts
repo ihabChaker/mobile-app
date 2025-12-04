@@ -1,4 +1,4 @@
-import apiService from './api.service';
+import apiService, { extractData, PaginatedResponse } from './api.service';
 import { Parcours } from '@/types/parcours.types';
 
 /**
@@ -9,7 +9,8 @@ class ParcoursService {
    * Récupérer tous les parcours
    */
   async getParcours(): Promise<Parcours[]> {
-    return apiService.get<Parcours[]>('/parcours');
+    const response = await apiService.get<Parcours[] | PaginatedResponse<Parcours>>('/parcours');
+    return extractData(response);
   }
 
   /**
@@ -31,7 +32,8 @@ class ParcoursService {
       longitude: longitude.toString(),
       ...(radius && { radius: radius.toString() }),
     });
-    return apiService.get<Parcours[]>(`/parcours/nearby?${params.toString()}`);
+    const response = await apiService.get<Parcours[] | PaginatedResponse<Parcours>>(`/parcours/nearby?${params.toString()}`);
+    return extractData(response);
   }
 }
 

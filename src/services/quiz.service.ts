@@ -1,4 +1,4 @@
-import apiService from './api.service';
+import apiService, { extractData, PaginatedResponse } from './api.service';
 
 /**
  * Interface pour une question de quiz
@@ -47,7 +47,8 @@ class QuizService {
    * Obtenir les questions pour un POI
    */
   async getQuestionsByPOI(poiId: number): Promise<QuizQuestion[]> {
-    return apiService.get<QuizQuestion[]>(`/quiz/poi/${poiId}`);
+    const response = await apiService.get<QuizQuestion[] | PaginatedResponse<QuizQuestion>>(`/quiz/poi/${poiId}`);
+    return extractData(response);
   }
 
   /**
@@ -71,7 +72,8 @@ class QuizService {
    * Obtenir l'historique des réponses
    */
   async getMyAnswers(): Promise<QuizAnswer[]> {
-    return apiService.get<QuizAnswer[]>('/quiz/my-answers');
+    const response = await apiService.get<QuizAnswer[] | PaginatedResponse<QuizAnswer>>('/quiz/my-answers');
+    return extractData(response);
   }
 
   /**

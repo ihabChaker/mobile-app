@@ -1,4 +1,4 @@
-import apiService from './api.service';
+import apiService, { extractData, PaginatedResponse } from './api.service';
 
 export interface TreasureHunt {
   id: number;
@@ -45,7 +45,8 @@ class TreasureHuntService {
    * Obtenir mes trésors trouvés
    */
   async getMyTreasures(): Promise<any[]> {
-    return apiService.get<any[]>('/treasure-hunts/found/me');
+    const response = await apiService.get<any[] | PaginatedResponse<any>>('/treasure-hunts/found/me');
+    return extractData(response);
   }
 }
 

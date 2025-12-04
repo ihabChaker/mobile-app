@@ -1,4 +1,4 @@
-import apiService from './api.service';
+import apiService, { extractData, PaginatedResponse } from './api.service';
 
 /**
  * Interface pour un badge
@@ -80,14 +80,16 @@ class RewardService {
    * Obtenir tous les badges disponibles
    */
   async getAllBadges(): Promise<Badge[]> {
-    return apiService.get<Badge[]>('/badges');
+    const response = await apiService.get<Badge[] | PaginatedResponse<Badge>>('/badges');
+    return extractData(response);
   }
 
   /**
    * Obtenir les badges de l'utilisateur
    */
   async getMyBadges(): Promise<UserBadge[]> {
-    return apiService.get<UserBadge[]>('/badges/my-badges');
+    const response = await apiService.get<UserBadge[] | PaginatedResponse<UserBadge>>('/badges/my-badges');
+    return extractData(response);
   }
 
   /**
@@ -101,14 +103,16 @@ class RewardService {
    * Obtenir tous les challenges actifs
    */
   async getActiveChallenges(): Promise<Challenge[]> {
-    return apiService.get<Challenge[]>('/challenges/active');
+    const response = await apiService.get<Challenge[] | PaginatedResponse<Challenge>>('/challenges/active');
+    return extractData(response);
   }
 
   /**
    * Obtenir les challenges de l'utilisateur
    */
   async getMyChallenges(): Promise<UserChallenge[]> {
-    return apiService.get<UserChallenge[]>('/challenges/my-challenges');
+    const response = await apiService.get<UserChallenge[] | PaginatedResponse<UserChallenge>>('/challenges/my-challenges');
+    return extractData(response);
   }
 
   /**

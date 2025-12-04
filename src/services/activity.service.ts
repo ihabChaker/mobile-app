@@ -1,4 +1,4 @@
-import apiService from './api.service';
+import apiService, { extractData, PaginatedResponse } from './api.service';
 
 export interface UserActivity {
   id: number;
@@ -63,7 +63,8 @@ class ActivityService {
    * Obtenir toutes mes activités
    */
   async getMyActivities(): Promise<UserActivity[]> {
-    return apiService.get<UserActivity[]>('/activities');
+    const response = await apiService.get<UserActivity[] | PaginatedResponse<UserActivity>>('/activities');
+    return extractData(response);
   }
 
   /**
@@ -105,7 +106,8 @@ class ActivityService {
    * Obtenir mes visites de POI
    */
   async getMyPOIVisits(): Promise<POIVisit[]> {
-    return apiService.get<POIVisit[]>('/activities/poi-visits/me');
+    const response = await apiService.get<POIVisit[] | PaginatedResponse<POIVisit>>('/activities/poi-visits/me');
+    return extractData(response);
   }
 }
 
