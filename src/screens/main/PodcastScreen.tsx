@@ -89,10 +89,10 @@ export const PodcastScreen: React.FC = () => {
         </Text>
         <View style={styles.podcastFooter}>
           <Text style={styles.podcastDuration}>
-            ⏱️ {Math.floor(item.duration / 60)}:{String(item.duration % 60).padStart(2, '0')}
+            ⏱️ {Math.floor(item.durationSeconds / 60)}:{String(item.durationSeconds % 60).padStart(2, '0')}
           </Text>
-          {item.author && (
-            <Text style={styles.podcastAuthor}>🎙️ {item.author}</Text>
+          {item.narrator && (
+            <Text style={styles.podcastAuthor}>🎙️ {item.narrator}</Text>
           )}
         </View>
       </View>

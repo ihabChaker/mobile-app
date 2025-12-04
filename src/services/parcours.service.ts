@@ -1,5 +1,5 @@
 import apiService, { extractData, PaginatedResponse } from './api.service';
-import { Parcours } from '@/types/parcours.types';
+import { Parcours, transformParcours } from '@/types/parcours.types';
 
 /**
  * Service pour la gestion des parcours
@@ -10,14 +10,16 @@ class ParcoursService {
    */
   async getParcours(): Promise<Parcours[]> {
     const response = await apiService.get<Parcours[] | PaginatedResponse<Parcours>>('/parcours');
-    return extractData(response);
+    const data = extractData(response);
+    return data.map(transformParcours);
   }
 
   /**
    * Récupérer un parcours par ID
    */
   async getParcoursById(id: number): Promise<Parcours> {
-    return apiService.get<Parcours>(`/parcours/${id}`);
+    const data = await apiService.get<Parcours>(`/parcours/${id}`);
+    return transformParcours(data);
   }
 
   /**
@@ -28,12 +30,13 @@ class ParcoursService {
    */
   async getNearbyParcours(latitude: number, longitude: number, radius?: number): Promise<Parcours[]> {
     const params = new URLSearchParams({
-      latitude: latitude.toString(),
-      longitude: longitude.toString(),
+      lat: latitude.toString(),
+      lon: longitude.toString(),
       ...(radius && { radius: radius.toString() }),
     });
     const response = await apiService.get<Parcours[] | PaginatedResponse<Parcours>>(`/parcours/nearby?${params.toString()}`);
-    return extractData(response);
+    const data = extractData(response);
+    return data.map(transformParcours);
   }
 }
 

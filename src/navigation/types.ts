@@ -26,7 +26,7 @@ export type MainTabParamList = {
 export type MainStackParamList = {
   MainTabs: undefined;
   ParcoursDetail: { parcoursId: number };
-  Quiz: { poiId: number; poiName: string };
+  Quiz: { quizId: number; quizTitle: string };
   Rewards: undefined;
   Leaderboard: undefined;
 };

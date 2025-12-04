@@ -16,6 +16,7 @@ import { colors, typography, spacing } from '@/theme';
 import parcoursService from '@/services/parcours.service';
 import activityService from '@/services/activity.service';
 import poiService from '@/services/poi.service';
+import quizService, { Quiz } from '@/services/quiz.service';
 import { Parcours, POI } from '@/types/parcours.types';
 
 type ParcoursDetailScreenProps = {
@@ -33,6 +34,7 @@ export const ParcoursDetailScreen: React.FC<ParcoursDetailScreenProps> = ({
   const { parcoursId } = route.params;
   const [parcours, setParcours] = useState<Parcours | null>(null);
   const [pois, setPois] = useState<POI[]>([]);
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isStarting, setIsStarting] = useState(false);
 
@@ -43,11 +45,13 @@ export const ParcoursDetailScreen: React.FC<ParcoursDetailScreenProps> = ({
   const loadParcours = async () => {
     try {
       setIsLoading(true);
-      const [parcoursData, poisData] = await Promise.all([
+      const [parcoursData, poisData, quizzesData] = await Promise.all([
         parcoursService.getParcoursById(parcoursId),
         poiService.getPOIsByParcours(parcoursId),
+        quizService.getQuizzesByParcours(parcoursId),
       ]);
       setParcours(parcoursData);
+      setQuizzes(quizzesData);
       setPois(poisData);
     } catch (error: any) {
       Alert.alert('Erreur', error.message || 'Impossible de charger le parcours');
@@ -120,11 +124,12 @@ export const ParcoursDetailScreen: React.FC<ParcoursDetailScreenProps> = ({
     );
   }
 
+  const difficulty = parcours.difficulty || 'moyen';
   const difficultyColor = {
     facile: colors.success,
     moyen: colors.warning,
     difficile: colors.error,
-  }[parcours.difficulty] || colors.gray500;
+  }[difficulty] || colors.gray500;
 
   return (
     <View style={styles.container}>
@@ -201,17 +206,6 @@ export const ParcoursDetailScreen: React.FC<ParcoursDetailScreenProps> = ({
                       {poi.visitDuration && (
                         <Text style={styles.poiDuration}>⏱️ ~{poi.visitDuration} min</Text>
                       )}
-                      <TouchableOpacity
-                        style={styles.quizButton}
-                        onPress={() => {
-                          navigation.navigate('Quiz', {
-                            poiId: poi.id,
-                            poiName: poi.name,
-                          });
-                        }}
-                      >
-                        <Text style={styles.quizButtonText}>❓ Tester mes connaissances</Text>
-                      </TouchableOpacity>
                     </View>
                   ))}
                 </View>
@@ -224,6 +218,50 @@ export const ParcoursDetailScreen: React.FC<ParcoursDetailScreenProps> = ({
                 </Text>
               </View>
             )}
+          </View>
+
+          {/* Quiz Section */}
+          {quizzes.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>❓ Quiz Disponibles</Text>
+              <Text style={styles.sectionText}>
+                Testez vos connaissances sur ce parcours !
+              </Text>
+              {quizzes.map((quiz) => (
+                <TouchableOpacity
+                  key={quiz.id}
+                  style={styles.quizCard}
+                  onPress={() => {
+                    navigation.navigate('Quiz', {
+                      quizId: quiz.id,
+                      quizTitle: quiz.title,
+                    });
+                  }}
+                >
+                  <View style={styles.quizCardContent}>
+                    <Text style={styles.quizTitle}>{quiz.title}</Text>
+                    <Text style={styles.quizDescription} numberOfLines={2}>
+                      {quiz.description || 'Aucune description'}
+                    </Text>
+                    <View style={styles.quizMeta}>
+                      <Text style={[
+                        styles.quizDifficulty,
+                        { color: quiz.difficulty === 'facile' ? colors.success : quiz.difficulty === 'difficile' ? colors.error : colors.warning }
+                      ]}>
+                        {quiz.difficulty}
+                      </Text>
+                      <Text style={styles.quizQuestions}>
+                        {quiz.questions?.length || 0} questions
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={styles.quizArrow}>→</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          <View style={styles.section}>
             <View style={styles.infoBox}>
               <Text style={styles.infoText}>
                 💡 Astuce : Activez votre GPS pour être guidé vers chaque point d'intérêt
@@ -240,7 +278,7 @@ export const ParcoursDetailScreen: React.FC<ParcoursDetailScreenProps> = ({
                 <View style={styles.routeContent}>
                   <Text style={styles.routeLabel}>Départ</Text>
                   <Text style={styles.routeText}>
-                    Lat: {parcours.startPoint.latitude.toFixed(4)}, Long: {parcours.startPoint.longitude.toFixed(4)}
+                    Lat: {parcours.startPoint?.latitude?.toFixed(4) ?? 'N/A'}, Long: {parcours.startPoint?.longitude?.toFixed(4) ?? 'N/A'}
                   </Text>
                 </View>
               </View>
@@ -252,7 +290,7 @@ export const ParcoursDetailScreen: React.FC<ParcoursDetailScreenProps> = ({
                 <View style={styles.routeContent}>
                   <Text style={styles.routeLabel}>Arrivée</Text>
                   <Text style={styles.routeText}>
-                    Lat: {parcours.endPoint.latitude.toFixed(4)}, Long: {parcours.endPoint.longitude.toFixed(4)}
+                    Lat: {parcours.endPoint?.latitude?.toFixed(4) ?? 'N/A'}, Long: {parcours.endPoint?.longitude?.toFixed(4) ?? 'N/A'}
                   </Text>
                 </View>
               </View>
@@ -585,6 +623,50 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  quizCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  quizCardContent: {
+    flex: 1,
+  },
+  quizTitle: {
+    ...typography.labelLarge,
+    color: colors.text,
+    marginBottom: spacing.xs,
+  },
+  quizDescription: {
+    ...typography.bodySmall,
+    color: colors.gray600,
+    marginBottom: spacing.xs,
+  },
+  quizMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  quizDifficulty: {
+    ...typography.labelSmall,
+    textTransform: 'capitalize',
+  },
+  quizQuestions: {
+    ...typography.caption,
+    color: colors.gray500,
+  },
+  quizArrow: {
+    ...typography.h4,
+    color: colors.primary,
+    marginLeft: spacing.sm,
   },
   bottomSpacer: {
     height: 80,

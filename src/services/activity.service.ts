@@ -1,28 +1,39 @@
 import apiService, { extractData, PaginatedResponse } from './api.service';
 
+export type ActivityType = 'walking' | 'running' | 'cycling';
+export type ActivityStatus = 'in_progress' | 'completed' | 'abandoned';
+
 export interface UserActivity {
   id: number;
   userId: number;
   parcoursId: number;
-  startedAt: string;
-  completedAt?: string;
-  duration?: number;
-  distance?: number;
+  startDatetime: string;
+  endDatetime?: string;
+  distanceCoveredKm?: number;
+  activityType: ActivityType;
   pointsEarned: number;
-  isCompleted: boolean;
+  status: ActivityStatus;
+  averageSpeed?: number;
+  gpxTraceUrl?: string;
   createdAt: string;
   updatedAt: string;
+  // Computed properties for backwards compatibility
+  startedAt?: string;
+  completedAt?: string;
+  distance?: number;
+  isCompleted?: boolean;
 }
 
 export interface CreateActivityDto {
   parcoursId: number;
+  activityType?: ActivityType;
 }
 
 export interface UpdateActivityDto {
-  completedAt?: string;
-  duration?: number;
-  distance?: number;
-  isCompleted?: boolean;
+  endDatetime?: string;
+  distanceCoveredKm?: number;
+  status?: ActivityStatus;
+  averageSpeed?: number;
 }
 
 export interface ActivityStats {
@@ -49,6 +60,17 @@ export interface RecordPOIVisitDto {
 }
 
 /**
+ * Transform backend activity to include computed fields for UI
+ */
+const transformActivity = (activity: UserActivity): UserActivity => ({
+  ...activity,
+  startedAt: activity.startDatetime,
+  completedAt: activity.endDatetime,
+  distance: activity.distanceCoveredKm,
+  isCompleted: activity.status === 'completed',
+});
+
+/**
  * Service pour le suivi des activités utilisateur
  */
 class ActivityService {
@@ -56,7 +78,11 @@ class ActivityService {
    * Démarrer une nouvelle activité (parcours)
    */
   async startActivity(data: CreateActivityDto): Promise<UserActivity> {
-    return apiService.post<UserActivity>('/activities', data);
+    const result = await apiService.post<UserActivity>('/activities', {
+      ...data,
+      activityType: data.activityType || 'walking',
+    });
+    return transformActivity(result);
   }
 
   /**
@@ -64,7 +90,8 @@ class ActivityService {
    */
   async getMyActivities(): Promise<UserActivity[]> {
     const response = await apiService.get<UserActivity[] | PaginatedResponse<UserActivity>>('/activities');
-    return extractData(response);
+    const data = extractData(response);
+    return data.map(transformActivity);
   }
 
   /**
@@ -78,14 +105,16 @@ class ActivityService {
    * Obtenir une activité par ID
    */
   async getActivityById(id: number): Promise<UserActivity> {
-    return apiService.get<UserActivity>(`/activities/${id}`);
+    const result = await apiService.get<UserActivity>(`/activities/${id}`);
+    return transformActivity(result);
   }
 
   /**
    * Mettre à jour une activité
    */
   async updateActivity(id: number, data: UpdateActivityDto): Promise<UserActivity> {
-    return apiService.put<UserActivity>(`/activities/${id}`, data);
+    const result = await apiService.put<UserActivity>(`/activities/${id}`, data);
+    return transformActivity(result);
   }
 
   /**

@@ -23,7 +23,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcast, onClose }) =>
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(podcast.duration);
+  const [duration, setDuration] = useState(podcast.durationSeconds);
   const [playbackRate, setPlaybackRate] = useState(1.0);
 
   useEffect(() => {
@@ -63,7 +63,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcast, onClose }) =>
       } else {
         // If this is a different podcast or first play
         if (audioService.getCurrentPodcastId() !== podcast.id) {
-          await audioService.loadAndPlay(podcast.audioUrl, podcast.id);
+          await audioService.loadAndPlay(podcast.audioFileUrl, podcast.id);
         } else {
           await audioService.play();
         }
@@ -138,8 +138,8 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcast, onClose }) =>
           <Text style={styles.title} numberOfLines={2}>
             {podcast.title}
           </Text>
-          {podcast.author && (
-            <Text style={styles.author}>Par {podcast.author}</Text>
+          {podcast.narrator && (
+            <Text style={styles.author}>Par {podcast.narrator}</Text>
           )}
         </View>
 

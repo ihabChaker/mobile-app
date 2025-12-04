@@ -175,11 +175,12 @@ export const CarteScreen: React.FC = () => {
           if (pathCoordinates.length < 2) return null;
 
           // Color based on difficulty
+          const difficulty = item.difficulty || 'moyen';
           const pathColor = {
             facile: colors.success,
             moyen: colors.warning,
             difficile: colors.error,
-          }[item.difficulty] || colors.primary;
+          }[difficulty] || colors.primary;
 
           return (
             <Polyline

@@ -1,41 +1,64 @@
 import apiService, { extractData, PaginatedResponse } from './api.service';
 
 /**
- * Interface pour une question de quiz
+ * Interface pour un quiz
  */
-export interface QuizQuestion {
+export interface Quiz {
   id: number;
-  poiId: number;
-  question: string;
-  options: string[];
-  correctAnswer: number;
-  points: number;
+  title: string;
+  description: string;
   difficulty: 'facile' | 'moyen' | 'difficile';
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  questions?: QuizQuestion[];
+}
+
+/**
+ * Interface pour une question de quiz
+ */
+export interface QuizQuestion {
+  id: number;
+  quizId: number;
+  questionText: string;
+  points: number;
+  orderIndex: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  answers?: QuizAnswer[];
 }
 
 /**
  * Interface pour une réponse de quiz
  */
 export interface QuizAnswer {
+  id: number;
   questionId: number;
-  selectedAnswer: number;
+  answerText: string;
   isCorrect: boolean;
-  pointsEarned: number;
-  answeredAt: string;
+  orderIndex: number;
 }
 
 /**
- * Interface pour les statistiques de quiz
+ * Interface pour une tentative de quiz
  */
-export interface QuizStats {
-  totalQuestions: number;
-  correctAnswers: number;
-  totalPoints: number;
-  accuracy: number;
-  bestStreak: number;
+export interface QuizAttempt {
+  id: number;
+  quizId: number;
+  userId: number;
+  score: number;
+  maxScore: number;
+  pointsEarned: number;
+  completedAt: string;
+}
+
+/**
+ * Interface pour soumettre une tentative
+ */
+export interface SubmitQuizAttemptDto {
+  quizId: number;
+  answers: { questionId: number; answerId: number }[];
 }
 
 /**
@@ -44,43 +67,47 @@ export interface QuizStats {
  */
 class QuizService {
   /**
-   * Obtenir les questions pour un POI
+   * Obtenir tous les quizzes
    */
-  async getQuestionsByPOI(poiId: number): Promise<QuizQuestion[]> {
-    const response = await apiService.get<QuizQuestion[] | PaginatedResponse<QuizQuestion>>(`/quiz/poi/${poiId}`);
+  async getAllQuizzes(): Promise<Quiz[]> {
+    const response = await apiService.get<Quiz[] | PaginatedResponse<Quiz>>('/quizzes');
     return extractData(response);
   }
 
   /**
-   * Obtenir une question spécifique
+   * Obtenir un quiz par ID avec ses questions et réponses
    */
-  async getQuestionById(id: number): Promise<QuizQuestion> {
-    return apiService.get<QuizQuestion>(`/quiz/${id}`);
+  async getQuizById(id: number): Promise<Quiz> {
+    return apiService.get<Quiz>(`/quizzes/${id}`);
   }
 
   /**
-   * Soumettre une réponse
+   * Obtenir les quizzes d'un parcours
    */
-  async submitAnswer(questionId: number, answer: number): Promise<QuizAnswer> {
-    return apiService.post<QuizAnswer>('/quiz/answer', {
-      questionId,
-      answer,
-    });
+  async getQuizzesByParcours(parcoursId: number): Promise<Quiz[]> {
+    const response = await apiService.get<Quiz[]>(`/quizzes/parcours/${parcoursId}`);
+    return Array.isArray(response) ? response : [];
   }
 
   /**
-   * Obtenir l'historique des réponses
+   * Soumettre une tentative de quiz
    */
-  async getMyAnswers(): Promise<QuizAnswer[]> {
-    const response = await apiService.get<QuizAnswer[] | PaginatedResponse<QuizAnswer>>('/quiz/my-answers');
+  async submitQuizAttempt(dto: SubmitQuizAttemptDto): Promise<{
+    attempt: QuizAttempt;
+    score: number;
+    maxScore: number;
+    pointsEarned: number;
+    results: { questionId: number; correct: boolean; points: number }[];
+  }> {
+    return apiService.post('/quizzes/attempts', dto);
+  }
+
+  /**
+   * Obtenir l'historique des tentatives de quiz
+   */
+  async getMyAttempts(): Promise<QuizAttempt[]> {
+    const response = await apiService.get<QuizAttempt[] | PaginatedResponse<QuizAttempt>>('/quizzes/attempts/me');
     return extractData(response);
-  }
-
-  /**
-   * Obtenir les statistiques de quiz
-   */
-  async getStats(): Promise<QuizStats> {
-    return apiService.get<QuizStats>('/quiz/stats');
   }
 }
 

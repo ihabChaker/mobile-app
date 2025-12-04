@@ -1,5 +1,5 @@
 import apiService, { extractData, PaginatedResponse } from './api.service';
-import { POI } from '@/types/parcours.types';
+import { POI, transformPOI } from '@/types/parcours.types';
 
 /**
  * Service pour la gestion des Points d'Intérêt
@@ -10,14 +10,16 @@ class POIService {
    */
   async getPOIsByParcours(parcoursId: number): Promise<POI[]> {
     const response = await apiService.get<POI[] | PaginatedResponse<POI>>(`/poi/parcours/${parcoursId}`);
-    return extractData(response);
+    const data = extractData(response);
+    return data.map(transformPOI);
   }
 
   /**
    * Obtenir un POI par ID
    */
   async getPOIById(id: number): Promise<POI> {
-    return apiService.get<POI>(`/poi/${id}`);
+    const data = await apiService.get<POI>(`/poi/${id}`);
+    return transformPOI(data);
   }
 }
 

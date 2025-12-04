@@ -3,52 +3,131 @@ export interface Coordinates {
   longitude: number;
 }
 
+/**
+ * Parcours entity - aligned with backend
+ */
 export interface Parcours {
   id: number;
-  title: string;
+  name: string;
   description: string;
-  difficulty: 'facile' | 'moyen' | 'difficile';
-  distance: number;
+  difficultyLevel: 'easy' | 'medium' | 'hard';
+  distanceKm: number;
   estimatedDuration: number;
-  startPoint: Coordinates;
-  endPoint: Coordinates;
-  gpxData?: string;
+  isPmrAccessible: boolean;
+  historicalTheme?: string;
+  startingPointLat: number;
+  startingPointLon: number;
   gpxFileUrl?: string;
-  geoJsonPath?: string;
-  thumbnailUrl?: string;
+  imageUrl?: string;
   isActive: boolean;
-  createdAt: string;
+  creationDate: string;
   updatedAt: string;
+  // Computed properties for convenience
+  startPoint?: Coordinates;
+  endPoint?: Coordinates; // Same as startPoint if not specified
+  // Alias for backwards compatibility
+  title?: string;
+  distance?: number;
+  thumbnailUrl?: string;
+  difficulty?: 'facile' | 'moyen' | 'difficile';
+  geoJsonPath?: string; // Alias for gpxFileUrl
 }
 
+/**
+ * Point of Interest entity - aligned with backend
+ */
 export interface POI {
   id: number;
   parcoursId: number;
   name: string;
   description: string;
-  type: 'monument' | 'musee' | 'cimetiere' | 'bunker' | 'plage' | 'autre';
-  coordinates: Coordinates;
-  address?: string;
+  poiType: 'bunker' | 'blockhaus' | 'memorial' | 'museum' | 'beach' | 'monument';
+  latitude: number;
+  longitude: number;
+  historicalPeriod?: string;
+  orderInParcours: number;
   qrCode?: string;
   imageUrl?: string;
-  audioGuideUrl?: string;
+  audioUrl?: string;
+  // Computed property for convenience
+  coordinates?: Coordinates;
+  // Alias for backwards compatibility - required for type safety
+  type: 'monument' | 'musee' | 'cimetiere' | 'bunker' | 'plage' | 'autre';
+  orderIndex?: number;
   visitDuration?: number;
-  isActive: boolean;
-  orderIndex: number;
-  createdAt: string;
-  updatedAt: string;
 }
 
+/**
+ * Podcast entity - aligned with backend
+ */
 export interface Podcast {
   id: number;
-  poiId: number;
   title: string;
   description: string;
-  audioUrl: string;
-  duration: number;
-  author?: string;
+  durationSeconds: number;
+  audioFileUrl: string;
+  narrator?: string;
+  language: string;
   thumbnailUrl?: string;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+  creationDate: string;
 }
+
+/**
+ * Maps backend difficulty level to French display value
+ */
+export const mapDifficultyToFrench = (level: Parcours['difficultyLevel']): 'facile' | 'moyen' | 'difficile' => {
+  const mapping: Record<Parcours['difficultyLevel'], 'facile' | 'moyen' | 'difficile'> = {
+    easy: 'facile',
+    medium: 'moyen',
+    hard: 'difficile',
+  };
+  return mapping[level] || 'moyen';
+};
+
+/**
+ * Maps backend POI type to display type
+ */
+export const mapPoiType = (poiType: POI['poiType']): POI['type'] => {
+  const mapping: Record<POI['poiType'], POI['type']> = {
+    bunker: 'bunker',
+    blockhaus: 'bunker',
+    memorial: 'monument',
+    museum: 'musee',
+    beach: 'plage',
+    monument: 'monument',
+  };
+  return mapping[poiType] || 'autre';
+};
+
+/**
+ * Transform backend Parcours to include computed/alias fields for UI
+ */
+export const transformParcours = (p: Parcours): Parcours => {
+  const startPoint = {
+    latitude: p.startingPointLat,
+    longitude: p.startingPointLon,
+  };
+  return {
+    ...p,
+    title: p.name,
+    distance: p.distanceKm,
+    thumbnailUrl: p.imageUrl,
+    difficulty: mapDifficultyToFrench(p.difficultyLevel),
+    startPoint,
+    endPoint: startPoint, // Use start point as end point if not specified
+    geoJsonPath: p.gpxFileUrl,
+  };
+};
+
+/**
+ * Transform backend POI to include computed/alias fields for UI
+ */
+export const transformPOI = (poi: POI): POI => ({
+  ...poi,
+  type: mapPoiType(poi.poiType),
+  orderIndex: poi.orderInParcours,
+  coordinates: {
+    latitude: poi.latitude,
+    longitude: poi.longitude,
+  },
+});
