@@ -1,6 +1,6 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MainStackParamList, MainTabParamList } from './types';
 import { ParcoursScreen } from '@/screens/main/ParcoursScreen';
 import { CarteScreen } from '@/screens/main/CarteScreen';
@@ -12,7 +12,7 @@ import { RewardsScreen } from '@/screens/main/RewardsScreen';
 import { LeaderboardScreen } from '@/screens/main/LeaderboardScreen';
 import { colors, typography } from '@/theme';
 
-const Tab = createMaterialTopTabNavigator<MainTabParamList>();
+const Tab = createBottomTabNavigator<MainTabParamList>();
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
 const MainTabs: React.FC = () => {
@@ -22,41 +22,56 @@ const MainTabs: React.FC = () => {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.gray500,
         tabBarLabelStyle: {
-          ...typography.labelMedium,
-          textTransform: 'none',
+          ...typography.labelSmall,
+          fontSize: 12,
         },
         tabBarStyle: {
           backgroundColor: colors.surface,
-          elevation: 0,
-          shadowOpacity: 0,
-          borderBottomWidth: 1,
-          borderBottomColor: colors.gray300,
+          borderTopWidth: 1,
+          borderTopColor: colors.gray300,
+          elevation: 8,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 8,
         },
-        tabBarIndicatorStyle: {
-          backgroundColor: colors.primary,
-          height: 3,
-        },
+        headerShown: false,
       }}
     >
       <Tab.Screen
         name="Parcours"
         component={ParcoursScreen}
-        options={{ tabBarLabel: 'Parcours' }}
+        options={{ 
+          tabBarLabel: 'Parcours',
+          tabBarIcon: () => null,
+        }}
       />
       <Tab.Screen
         name="Carte"
         component={CarteScreen}
-        options={{ tabBarLabel: 'Carte' }}
+        options={{ 
+          tabBarLabel: 'Carte',
+          tabBarIcon: () => null,
+        }}
       />
       <Tab.Screen
         name="Podcasts"
         component={PodcastScreen}
-        options={{ tabBarLabel: 'Podcasts' }}
+        options={{ 
+          tabBarLabel: 'Podcasts',
+          tabBarIcon: () => null,
+        }}
       />
       <Tab.Screen
         name="Profil"
         component={ProfilScreen}
-        options={{ tabBarLabel: 'Profil' }}
+        options={{ 
+          tabBarLabel: 'Profil',
+          tabBarIcon: () => null,
+        }}
       />
     </Tab.Navigator>
   );

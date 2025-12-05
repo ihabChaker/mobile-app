@@ -49,6 +49,12 @@ export const CarteScreen: React.FC = () => {
   const parseGeoJSON = (geoJsonPath?: string): Array<{latitude: number, longitude: number}> => {
     if (!geoJsonPath) return [];
     
+    // Check if it's a URL (backend might be returning a URL to a GeoJSON file)
+    if (geoJsonPath.startsWith('http')) {
+      console.log('GeoJSON is a URL, skipping path rendering');
+      return [];
+    }
+    
     try {
       const geoJson = JSON.parse(geoJsonPath);
       
@@ -62,7 +68,7 @@ export const CarteScreen: React.FC = () => {
       
       return [];
     } catch (error) {
-      console.error('Error parsing GeoJSON:', error);
+      // Silently ignore parsing errors for invalid JSON
       return [];
     }
   };
@@ -203,8 +209,8 @@ export const CarteScreen: React.FC = () => {
             <Marker
               key={`parcours-${item.id}`}
               coordinate={{
-                latitude: item.startPoint.latitude,
-                longitude: item.startPoint.longitude,
+                latitude: parseFloat(String(item.startPoint.latitude)),
+                longitude: parseFloat(String(item.startPoint.longitude)),
               }}
               title={`🚩 ${item.title}`}
               description={`${item.distance} km • ${item.estimatedDuration} min`}
@@ -230,8 +236,8 @@ export const CarteScreen: React.FC = () => {
             <Marker
               key={`poi-${poi.id}`}
               coordinate={{
-                latitude: poi.coordinates.latitude,
-                longitude: poi.coordinates.longitude,
+                latitude: parseFloat(String(poi.coordinates.latitude)),
+                longitude: parseFloat(String(poi.coordinates.longitude)),
               }}
               title={`${poiIcon} ${poi.name}`}
               description={poi.type}

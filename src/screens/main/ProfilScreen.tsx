@@ -213,14 +213,6 @@ export const ProfilScreen: React.FC = () => {
 
       {/* Action Buttons */}
       <View style={styles.actionsContainer}>
-        <TouchableOpacity style={styles.actionButton} activeOpacity={0.7}>
-          <Text style={styles.actionButtonText}>⚙️ Paramètres</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionButton} activeOpacity={0.7}>
-          <Text style={styles.actionButtonText}>📊 Statistiques</Text>
-        </TouchableOpacity>
-
         <TouchableOpacity
           style={styles.actionButton}
           activeOpacity={0.7}

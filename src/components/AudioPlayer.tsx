@@ -8,7 +8,7 @@ import {
   Image,
 } from 'react-native';
 import { colors, typography, spacing } from '@/theme';
-import audioService from '@/services/audio.service';
+import { useAudioPlayer, AudioSource } from 'expo-audio';
 import { Podcast } from '@/types/parcours.types';
 
 interface AudioPlayerProps {
@@ -20,6 +20,7 @@ interface AudioPlayerProps {
  * Lecteur audio pour les podcasts
  */
 export const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcast, onClose }) => {
+  const player = useAudioPlayer({ uri: podcast.audioFileUrl });
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -27,47 +28,39 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcast, onClose }) =>
   const [playbackRate, setPlaybackRate] = useState(1.0);
 
   useEffect(() => {
-    // Initialize audio on mount
-    audioService.initialize();
-
     // Cleanup on unmount
     return () => {
-      audioService.stop();
+      if (player.playing) {
+        player.pause();
+      }
     };
   }, []);
 
   useEffect(() => {
     // Update playback status every second
-    const interval = setInterval(async () => {
-      if (audioService.getIsPlaying()) {
-        const status = await audioService.getStatus();
-        if (status && status.isLoaded) {
-          setCurrentTime(Math.floor(status.positionMillis / 1000));
-          if (status.durationMillis) {
-            setDuration(Math.floor(status.durationMillis / 1000));
-          }
+    const interval = setInterval(() => {
+      if (player.playing) {
+        setCurrentTime(Math.floor(player.currentTime));
+        if (player.duration) {
+          setDuration(Math.floor(player.duration));
         }
+        setIsPlaying(true);
+      } else {
+        setIsPlaying(false);
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [player]);
 
   const handlePlayPause = async () => {
     try {
       setIsLoading(true);
       
-      if (isPlaying) {
-        await audioService.pause();
-        setIsPlaying(false);
+      if (player.playing) {
+        player.pause();
       } else {
-        // If this is a different podcast or first play
-        if (audioService.getCurrentPodcastId() !== podcast.id) {
-          await audioService.loadAndPlay(podcast.audioFileUrl, podcast.id);
-        } else {
-          await audioService.play();
-        }
-        setIsPlaying(true);
+        player.play();
       }
     } catch (error) {
       console.error('Error playing audio:', error);
@@ -76,28 +69,29 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcast, onClose }) =>
     }
   };
 
-  const handleSeekForward = async () => {
-    await audioService.seekForward(10);
+  const handleSeekForward = () => {
+    const newTime = Math.min(player.currentTime + 10, player.duration || 0);
+    player.currentTime = newTime;
   };
 
-  const handleSeekBackward = async () => {
-    await audioService.seekBackward(10);
+  const handleSeekBackward = () => {
+    const newTime = Math.max(player.currentTime - 10, 0);
+    player.currentTime = newTime;
   };
 
-  const handleChangeSpeed = async () => {
+  const handleChangeSpeed = () => {
     const speeds = [1.0, 1.25, 1.5, 1.75, 2.0];
     const currentIndex = speeds.indexOf(playbackRate);
     const nextIndex = (currentIndex + 1) % speeds.length;
     const newSpeed = speeds[nextIndex];
     
-    await audioService.setPlaybackRate(newSpeed);
+    player.playbackRate = newSpeed;
     setPlaybackRate(newSpeed);
   };
 
-  const handleStop = async () => {
-    await audioService.stop();
-    setIsPlaying(false);
-    setCurrentTime(0);
+  const handleStop = () => {
+    player.pause();
+    player.currentTime = 0;
     onClose();
   };
 

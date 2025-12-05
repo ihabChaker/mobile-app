@@ -21,9 +21,12 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.mobileapp"
+      "package": "com.anonymous.mobileapp",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyBpmW5mt8qSh2cnIhIsi9U9EasqtEF91tU"
+        }
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"

@@ -119,9 +119,7 @@ class RewardService {
    * Démarrer un challenge
    */
   async startChallenge(challengeId: number): Promise<UserChallenge> {
-    return apiService.post<UserChallenge>('/challenges/start', {
-      challengeId,
-    });
+    return apiService.post<UserChallenge>(`/challenges/${challengeId}/start`, {});
   }
 
   /**
