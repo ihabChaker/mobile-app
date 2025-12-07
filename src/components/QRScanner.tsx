@@ -17,7 +17,7 @@ if (Platform.OS !== 'web') {
     const ExpoCamera = require('expo-camera');
     BarCodeScanner = ExpoCamera.BarCodeScanner;
     Camera = ExpoCamera.Camera;
-  } catch (error) {
+  } catch {
     console.warn('expo-camera not installed');
   }
 }
@@ -89,7 +89,9 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
     return (
       <View style={styles.container}>
         <View style={styles.content}>
-          <Text style={styles.loadingText}>Demande de permission caméra...</Text>
+          <Text style={styles.loadingText}>
+            Demande de permission caméra...
+          </Text>
         </View>
       </View>
     );
@@ -140,10 +142,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
                   ? 'QR Code scanné ! 🎉'
                   : 'Placez le QR code dans le cadre'}
               </Text>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={onClose}
-              >
+              <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
                 <Text style={styles.cancelButtonText}>Annuler</Text>
               </TouchableOpacity>
               {scanned && (

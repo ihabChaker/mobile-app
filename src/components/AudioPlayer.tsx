@@ -8,7 +8,7 @@ import {
   Image,
 } from 'react-native';
 import { colors, typography, spacing } from '@/theme';
-import { useAudioPlayer, AudioSource } from 'expo-audio';
+import { useAudioPlayer } from 'expo-audio';
 import { Podcast } from '@/types/parcours.types';
 
 interface AudioPlayerProps {
@@ -19,7 +19,10 @@ interface AudioPlayerProps {
 /**
  * Lecteur audio pour les podcasts
  */
-export const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcast, onClose }) => {
+export const AudioPlayer: React.FC<AudioPlayerProps> = ({
+  podcast,
+  onClose,
+}) => {
   const player = useAudioPlayer({ uri: podcast.audioFileUrl });
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -56,7 +59,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcast, onClose }) =>
   const handlePlayPause = async () => {
     try {
       setIsLoading(true);
-      
+
       if (player.playing) {
         player.pause();
       } else {
@@ -84,7 +87,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcast, onClose }) =>
     const currentIndex = speeds.indexOf(playbackRate);
     const nextIndex = (currentIndex + 1) % speeds.length;
     const newSpeed = speeds[nextIndex];
-    
+
     player.playbackRate = newSpeed;
     setPlaybackRate(newSpeed);
   };
@@ -140,7 +143,9 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcast, onClose }) =>
         {/* Progress Bar */}
         <View style={styles.progressContainer}>
           <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${progressPercentage}%` }]} />
+            <View
+              style={[styles.progressFill, { width: `${progressPercentage}%` }]}
+            />
           </View>
           <View style={styles.timeContainer}>
             <Text style={styles.time}>{formatTime(currentTime)}</Text>

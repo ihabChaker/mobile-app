@@ -1,5 +1,6 @@
-import apiService from './api.service';
+import apiService, { extractData, PaginatedResponse } from './api.service';
 import { User } from '@/types/auth.types';
+import { UserBadge, Badge } from '@/types/backend.types';
 
 interface UserStats {
   totalActivities: number;
@@ -51,6 +52,32 @@ class UserService {
    */
   async getUserById(id: number): Promise<User> {
     return apiService.get<User>(`/users/${id}`);
+  }
+
+  /**
+   * Récupérer mes badges
+   */
+  async getMyBadges(
+    page: number = 1,
+    limit: number = 20
+  ): Promise<UserBadge[]> {
+    const response = await apiService.get<
+      UserBadge[] | PaginatedResponse<UserBadge>
+    >(`/badges/my-badges?page=${page}&limit=${limit}`);
+    return extractData(response);
+  }
+
+  /**
+   * Récupérer la progression d'un badge
+   */
+  async getBadgeProgress(badgeId: number): Promise<{
+    badge: Badge;
+    currentProgress: number;
+    targetValue: number;
+    progressPercentage: number;
+    isUnlocked: boolean;
+  }> {
+    return apiService.get(`/user-badges/progress/${badgeId}`);
   }
 }
 

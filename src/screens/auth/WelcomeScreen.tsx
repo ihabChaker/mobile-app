@@ -1,11 +1,6 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Image,
-  Dimensions,
-} from 'react-native';
+import { View, Text, StyleSheet, Image, Dimensions } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '@/navigation/types';
 import { colors, typography, spacing } from '@/theme';
@@ -19,7 +14,7 @@ type WelcomeScreenProps = {
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation }) => {
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* Logo HistoRando */}
       <View style={styles.illustrationContainer}>
         <Image
@@ -54,7 +49,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation }) => {
           size="large"
         />
       </View>
-    </View>
+    </SafeAreaView>
   );
 };
 

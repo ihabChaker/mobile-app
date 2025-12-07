@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '@/navigation/types';
 import { colors, typography, spacing } from '@/theme';
@@ -46,7 +47,13 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
       formData;
 
     // Validation
-    if (!firstName.trim() || !lastName.trim() || !username.trim() || !email.trim() || !password) {
+    if (
+      !firstName.trim() ||
+      !lastName.trim() ||
+      !username.trim() ||
+      !email.trim() ||
+      !password
+    ) {
       Alert.alert('Erreur', 'Veuillez remplir tous les champs');
       return;
     }
@@ -57,7 +64,10 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
     }
 
     if (username.length < 3) {
-      Alert.alert('Erreur', "Le nom d'utilisateur doit contenir au moins 3 caractères");
+      Alert.alert(
+        'Erreur',
+        "Le nom d'utilisateur doit contenir au moins 3 caractères"
+      );
       return;
     }
 
@@ -101,7 +111,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
     } catch (error: any) {
       const errorMessage = error.message || "Erreur lors de l'inscription";
       dispatch(setError(errorMessage));
-      Alert.alert('Échec de l\'inscription', errorMessage);
+      Alert.alert("Échec de l'inscription", errorMessage);
     } finally {
       setIsLoading(false);
       dispatch(setLoading(false));
@@ -113,128 +123,130 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Créer un compte</Text>
-          <Text style={styles.subtitle}>
-            Rejoignez HistoRando et commencez votre aventure
-          </Text>
-        </View>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.title}>Créer un compte</Text>
+            <Text style={styles.subtitle}>
+              Rejoignez HistoRando et commencez votre aventure
+            </Text>
+          </View>
 
-        {/* Formulaire */}
-        <View style={styles.form}>
-          <View style={styles.row}>
-            <View style={[styles.inputContainer, styles.halfWidth]}>
-              <Text style={styles.label}>Prénom</Text>
+          {/* Formulaire */}
+          <View style={styles.form}>
+            <View style={styles.row}>
+              <View style={[styles.inputContainer, styles.halfWidth]}>
+                <Text style={styles.label}>Prénom</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Jean"
+                  placeholderTextColor={colors.gray500}
+                  value={formData.firstName}
+                  onChangeText={value => updateField('firstName', value)}
+                  autoCapitalize="words"
+                />
+              </View>
+
+              <View style={[styles.inputContainer, styles.halfWidth]}>
+                <Text style={styles.label}>Nom</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Dupont"
+                  placeholderTextColor={colors.gray500}
+                  value={formData.lastName}
+                  onChangeText={value => updateField('lastName', value)}
+                  autoCapitalize="words"
+                />
+              </View>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Nom d'utilisateur</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Jean"
+                placeholder="jean_dupont"
                 placeholderTextColor={colors.gray500}
-                value={formData.firstName}
-                onChangeText={value => updateField('firstName', value)}
-                autoCapitalize="words"
+                value={formData.username}
+                onChangeText={value => updateField('username', value)}
+                autoCapitalize="none"
+                autoCorrect={false}
               />
             </View>
 
-            <View style={[styles.inputContainer, styles.halfWidth]}>
-              <Text style={styles.label}>Nom</Text>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Email</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Dupont"
+                placeholder="jean@email.com"
                 placeholderTextColor={colors.gray500}
-                value={formData.lastName}
-                onChangeText={value => updateField('lastName', value)}
-                autoCapitalize="words"
+                value={formData.email}
+                onChangeText={value => updateField('email', value)}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
               />
             </View>
-          </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Nom d'utilisateur</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="jean_dupont"
-              placeholderTextColor={colors.gray500}
-              value={formData.username}
-              onChangeText={value => updateField('username', value)}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Mot de passe</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="••••••••"
+                placeholderTextColor={colors.gray500}
+                value={formData.password}
+                onChangeText={value => updateField('password', value)}
+                secureTextEntry
+                autoCapitalize="none"
+              />
+            </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="jean@email.com"
-              placeholderTextColor={colors.gray500}
-              value={formData.email}
-              onChangeText={value => updateField('email', value)}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Confirmer le mot de passe</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="••••••••"
+                placeholderTextColor={colors.gray500}
+                value={formData.confirmPassword}
+                onChangeText={value => updateField('confirmPassword', value)}
+                secureTextEntry
+                autoCapitalize="none"
+              />
+            </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Mot de passe</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="••••••••"
-              placeholderTextColor={colors.gray500}
-              value={formData.password}
-              onChangeText={value => updateField('password', value)}
-              secureTextEntry
-              autoCapitalize="none"
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Confirmer le mot de passe</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="••••••••"
-              placeholderTextColor={colors.gray500}
-              value={formData.confirmPassword}
-              onChangeText={value => updateField('confirmPassword', value)}
-              secureTextEntry
-              autoCapitalize="none"
-            />
-          </View>
-
-          <TouchableOpacity
-            style={[
-              styles.registerButton,
-              isLoading && styles.registerButtonDisabled,
-            ]}
-            onPress={handleRegister}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color={colors.white} />
-            ) : (
-              <Text style={styles.registerButtonText}>S'inscrire</Text>
-            )}
-          </TouchableOpacity>
-
-          <View style={styles.loginContainer}>
-            <Text style={styles.loginText}>Déjà un compte ? </Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-              <Text style={styles.loginLink}>Se connecter</Text>
+            <TouchableOpacity
+              style={[
+                styles.registerButton,
+                isLoading && styles.registerButtonDisabled,
+              ]}
+              onPress={handleRegister}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <Text style={styles.registerButtonText}>S'inscrire</Text>
+              )}
             </TouchableOpacity>
+
+            <View style={styles.loginContainer}>
+              <Text style={styles.loginText}>Déjà un compte ? </Text>
+              <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+                <Text style={styles.loginLink}>Se connecter</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 

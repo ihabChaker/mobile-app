@@ -8,33 +8,18 @@ import {
   Platform,
   TouchableOpacity,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, typography, spacing } from '@/theme';
 import parcoursService from '@/services/parcours.service';
 import poiService from '@/services/poi.service';
 import { Parcours, POI } from '@/types/parcours.types';
-
-// Import conditionnel pour éviter les erreurs web
-let MapView: any = null;
-let Marker: any = null;
-let Polyline: any = null;
-let PROVIDER_GOOGLE: any = null;
-let Location: any = null;
-
-if (Platform.OS !== 'web') {
-  const Maps = require('react-native-maps');
-  MapView = Maps.default;
-  Marker = Maps.Marker;
-  Polyline = Maps.Polyline;
-  PROVIDER_GOOGLE = Maps.PROVIDER_GOOGLE;
-  Location = require('expo-location');
-}
+import OSMMapView, { Marker, Polyline } from '@/components/OSMMapView';
+import * as Location from 'expo-location';
 
 /**
  * Écran Carte Interactive
  */
 export const CarteScreen: React.FC = () => {
-  const insets = useSafeAreaInsets();
   const [location, setLocation] = useState<any>(null);
   const [parcours, setParcours] = useState<Parcours[]>([]);
   const [pois, setPois] = useState<POI[]>([]);
@@ -46,18 +31,19 @@ export const CarteScreen: React.FC = () => {
   /**
    * Parse GeoJSON string to extract coordinates for Polyline
    */
-  const parseGeoJSON = (geoJsonPath?: string): Array<{latitude: number, longitude: number}> => {
+  const parseGeoJSON = (
+    geoJsonPath?: string
+  ): Array<{ latitude: number; longitude: number }> => {
     if (!geoJsonPath) return [];
-    
+
     // Check if it's a URL (backend might be returning a URL to a GeoJSON file)
     if (geoJsonPath.startsWith('http')) {
-      console.log('GeoJSON is a URL, skipping path rendering');
       return [];
     }
-    
+
     try {
       const geoJson = JSON.parse(geoJsonPath);
-      
+
       // GeoJSON LineString format: { type: "LineString", coordinates: [[lon, lat], [lon, lat], ...] }
       if (geoJson.type === 'LineString' && Array.isArray(geoJson.coordinates)) {
         return geoJson.coordinates.map((coord: [number, number]) => ({
@@ -65,9 +51,9 @@ export const CarteScreen: React.FC = () => {
           latitude: coord[1],
         }));
       }
-      
+
       return [];
-    } catch (error) {
+    } catch {
       // Silently ignore parsing errors for invalid JSON
       return [];
     }
@@ -83,11 +69,11 @@ export const CarteScreen: React.FC = () => {
       try {
         // Demander la permission de localisation
         const { status } = await Location.requestForegroundPermissionsAsync();
-        
+
         if (status !== 'granted') {
           Alert.alert(
             'Permission refusée',
-            'L\'accès à votre position est nécessaire pour afficher votre position sur la carte.',
+            "L'accès à votre position est nécessaire pour afficher votre position sur la carte.",
             [{ text: 'OK' }]
           );
           setHasLocationPermission(false);
@@ -104,17 +90,20 @@ export const CarteScreen: React.FC = () => {
 
         // Charger les POIs pour tous les parcours
         const allPois: POI[] = [];
-        for (const p of (parcoursData || [])) {
+        for (const p of parcoursData || []) {
           try {
             const parcoursPois = await poiService.getPOIsByParcours(p.id);
             allPois.push(...parcoursPois);
-          } catch (error) {
+          } catch {
             // Continuer si un parcours n'a pas de POIs
           }
         }
         setPois(allPois);
       } catch (error: any) {
-        Alert.alert('Erreur', error.message || 'Erreur lors du chargement de la carte');
+        Alert.alert(
+          'Erreur',
+          error.message || 'Erreur lors du chargement de la carte'
+        );
       } finally {
         setIsLoading(false);
       }
@@ -124,25 +113,17 @@ export const CarteScreen: React.FC = () => {
   // Message pour la version web
   if (Platform.OS === 'web') {
     return (
-      <View style={[styles.webContainer, { paddingTop: insets.top }]}>
+      <SafeAreaView style={styles.webContainer} edges={['top', 'bottom']}>
         <Text style={styles.webIcon}>🗺️</Text>
         <Text style={styles.webTitle}>Carte Interactive</Text>
         <Text style={styles.webText}>
           La carte interactive est disponible uniquement sur mobile.
         </Text>
         <Text style={styles.webSubtext}>
-          Scannez le QR code avec Expo Go sur votre téléphone pour voir la carte.
+          Scannez le QR code avec Expo Go sur votre téléphone pour voir la
+          carte.
         </Text>
-      </View>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <View style={[styles.loadingContainer, { paddingTop: insets.top }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Chargement de la carte...</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
@@ -154,6 +135,27 @@ export const CarteScreen: React.FC = () => {
     longitudeDelta: 0.5,
   };
 
+  // Show map immediately with loading overlay
+  if (isLoading) {
+    return (
+      <View style={styles.container}>
+        <OSMMapView
+          style={styles.map}
+          initialRegion={defaultRegion}
+          markers={[]}
+          polylines={[]}
+          showUserLocation={false}
+        />
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingCard}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>Chargement de la carte...</Text>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
   const initialRegion = location
     ? {
         latitude: location.coords.latitude,
@@ -163,97 +165,107 @@ export const CarteScreen: React.FC = () => {
       }
     : defaultRegion;
 
-  return (
-    <View style={styles.container}>
-      <MapView
-        style={styles.map}
-        provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-        initialRegion={initialRegion}
-        showsUserLocation={hasLocationPermission}
-        showsMyLocationButton={hasLocationPermission}
-        showsCompass
-        showsScale
-      >
-        {/* GPX Path Polylines */}
-        {showGPXPaths && parcours.map(item => {
+  // Prepare markers for parcours
+  const parcoursMarkers: Marker[] = parcours
+    .filter(item => {
+      const lat = item.startPoint?.latitude;
+      const lon = item.startPoint?.longitude;
+      return (
+        lat != null && lon != null && !isNaN(Number(lat)) && !isNaN(Number(lon))
+      );
+    })
+    .map(item => ({
+      id: `parcours-${item.id}`,
+      latitude: Number(item.startPoint!.latitude),
+      longitude: Number(item.startPoint!.longitude),
+      title: `🚩 ${item.title}`,
+      description: `${item.distance} km • ${item.estimatedDuration} min`,
+      color: colors.primary,
+    }));
+
+  // Prepare markers for POIs
+  const poiMarkers: Marker[] = showPOIs
+    ? pois
+        .filter(poi => {
+          const lat = poi.coordinates?.latitude;
+          const lon = poi.coordinates?.longitude;
+          return (
+            lat != null &&
+            lon != null &&
+            !isNaN(Number(lat)) &&
+            !isNaN(Number(lon))
+          );
+        })
+        .map(poi => {
+          const poiIcon =
+            {
+              monument: '🏛️',
+              musee: '🏛️',
+              cimetiere: '⚰️',
+              bunker: '🛡️',
+              plage: '🏖️',
+              autre: '📍',
+            }[poi.type] || '📍';
+
+          return {
+            id: `poi-${poi.id}`,
+            latitude: Number(poi.coordinates!.latitude),
+            longitude: Number(poi.coordinates!.longitude),
+            title: `${poiIcon} ${poi.name}`,
+            description: poi.type,
+            color: colors.secondary,
+          };
+        })
+    : [];
+
+  // Combine all markers
+  const allMarkers = [...parcoursMarkers, ...poiMarkers];
+
+  // Prepare polylines for GPX paths
+  const polylines: Polyline[] = showGPXPaths
+    ? (parcours
+        .map(item => {
           const pathCoordinates = parseGeoJSON(item.geoJsonPath);
-          
           if (pathCoordinates.length < 2) return null;
 
-          // Color based on difficulty
           const difficulty = item.difficulty || 'moyen';
-          const pathColor = {
-            facile: colors.success,
-            moyen: colors.warning,
-            difficile: colors.error,
-          }[difficulty] || colors.primary;
+          const pathColor =
+            {
+              facile: colors.success,
+              moyen: colors.warning,
+              difficile: colors.error,
+            }[difficulty] || colors.primary;
 
-          return (
-            <Polyline
-              key={`path-${item.id}`}
-              coordinates={pathCoordinates}
-              strokeColor={pathColor}
-              strokeWidth={3}
-              lineCap="round"
-              lineJoin="round"
-            />
-          );
-        })}
+          return {
+            id: `path-${item.id}`,
+            coordinates: pathCoordinates,
+            color: pathColor,
+            width: 3,
+          };
+        })
+        .filter(p => p !== null) as Polyline[])
+    : [];
 
-        {/* Marqueurs de parcours */}
-        {parcours.map(item => {
-          // Utiliser les coordonnées du point de départ
-          if (!item.startPoint?.latitude || !item.startPoint?.longitude) return null;
-
-          return (
-            <Marker
-              key={`parcours-${item.id}`}
-              coordinate={{
-                latitude: parseFloat(String(item.startPoint.latitude)),
-                longitude: parseFloat(String(item.startPoint.longitude)),
-              }}
-              title={`🚩 ${item.title}`}
-              description={`${item.distance} km • ${item.estimatedDuration} min`}
-              pinColor={colors.primary}
-            />
-          );
-        })}
-
-        {/* Marqueurs de POIs */}
-        {showPOIs && pois.map(poi => {
-          if (!poi.coordinates?.latitude || !poi.coordinates?.longitude) return null;
-
-          const poiIcon = {
-            monument: '🏛️',
-            musee: '🏛️',
-            cimetiere: '⚰️',
-            bunker: '🛡️',
-            plage: '🏖️',
-            autre: '📍',
-          }[poi.type] || '📍';
-
-          return (
-            <Marker
-              key={`poi-${poi.id}`}
-              coordinate={{
-                latitude: parseFloat(String(poi.coordinates.latitude)),
-                longitude: parseFloat(String(poi.coordinates.longitude)),
-              }}
-              title={`${poiIcon} ${poi.name}`}
-              description={poi.type}
-              pinColor={colors.secondary}
-            />
-          );
-        })}
-      </MapView>
+  return (
+    <View style={styles.container}>
+      <OSMMapView
+        style={styles.map}
+        initialRegion={initialRegion}
+        markers={allMarkers}
+        polylines={polylines}
+        showUserLocation={hasLocationPermission}
+      />
 
       {parcours.length === 0 && pois.length === 0 ? (
         <View style={styles.emptyMapOverlay}>
           <View style={styles.emptyMapCard}>
             <Text style={styles.emptyMapIcon}>🗺️</Text>
-            <Text style={styles.emptyMapTitle}>Aucun parcours sur la carte</Text>
+            <Text style={styles.emptyMapTitle}>
+              Aucun parcours sur la carte
+            </Text>
             <Text style={styles.emptyMapText}>
-              Les parcours et points d'intérêt apparaîtront ici une fois disponibles.
+              Les parcours et points d'intérêt apparaîtront ici une fois
+              disponibles.
             </Text>
           </View>
         </View>
@@ -270,26 +282,42 @@ export const CarteScreen: React.FC = () => {
                 <Text style={styles.legendItem}>📍 Points d'intérêt</Text>
               </View>
             )}
-            
+
             {/* Toggle buttons */}
             <View style={styles.toggleContainer}>
               {parcours.some(p => p.geoJsonPath) && (
                 <TouchableOpacity
-                  style={[styles.toggleButton, showGPXPaths && styles.toggleButtonActive]}
+                  style={[
+                    styles.toggleButton,
+                    showGPXPaths && styles.toggleButtonActive,
+                  ]}
                   onPress={() => setShowGPXPaths(!showGPXPaths)}
                 >
-                  <Text style={[styles.toggleButtonText, showGPXPaths && styles.toggleButtonTextActive]}>
+                  <Text
+                    style={[
+                      styles.toggleButtonText,
+                      showGPXPaths && styles.toggleButtonTextActive,
+                    ]}
+                  >
                     {showGPXPaths ? '✓' : ''} Chemins
                   </Text>
                 </TouchableOpacity>
               )}
-              
+
               {pois.length > 0 && (
                 <TouchableOpacity
-                  style={[styles.toggleButton, showPOIs && styles.toggleButtonActive]}
+                  style={[
+                    styles.toggleButton,
+                    showPOIs && styles.toggleButtonActive,
+                  ]}
                   onPress={() => setShowPOIs(!showPOIs)}
                 >
-                  <Text style={[styles.toggleButtonText, showPOIs && styles.toggleButtonTextActive]}>
+                  <Text
+                    style={[
+                      styles.toggleButtonText,
+                      showPOIs && styles.toggleButtonTextActive,
+                    ]}
+                  >
                     {showPOIs ? '✓' : ''} POIs
                   </Text>
                 </TouchableOpacity>
@@ -309,11 +337,26 @@ const styles = StyleSheet.create({
   map: {
     flex: 1,
   },
-  loadingContainer: {
-    flex: 1,
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.background,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+  },
+  loadingCard: {
+    backgroundColor: colors.surface,
+    padding: spacing.xl,
+    borderRadius: 16,
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 4.0,
   },
   loadingText: {
     ...typography.bodyMedium,

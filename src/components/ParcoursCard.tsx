@@ -6,6 +6,8 @@ import { Parcours } from '@/types/parcours.types';
 interface ParcoursCardProps {
   parcours: Parcours;
   onPress: () => void;
+  isActive?: boolean;
+  onAbandon?: () => void;
 }
 
 /**
@@ -14,13 +16,16 @@ interface ParcoursCardProps {
 export const ParcoursCard: React.FC<ParcoursCardProps> = ({
   parcours,
   onPress,
+  isActive = false,
+  onAbandon,
 }) => {
   const difficulty = parcours.difficulty || 'moyen';
-  const difficultyColor = {
-    facile: colors.success,
-    moyen: colors.warning,
-    difficile: colors.error,
-  }[difficulty] || colors.gray500;
+  const difficultyColor =
+    {
+      facile: colors.success,
+      moyen: colors.warning,
+      difficile: colors.error,
+    }[difficulty] || colors.gray500;
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
@@ -36,11 +41,18 @@ export const ParcoursCard: React.FC<ParcoursCardProps> = ({
             <Text style={styles.placeholderText}>📍</Text>
           </View>
         )}
-        <View style={[styles.difficultyBadge, { backgroundColor: difficultyColor }]}>
+        <View
+          style={[styles.difficultyBadge, { backgroundColor: difficultyColor }]}
+        >
           <Text style={styles.difficultyText}>
             {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
           </Text>
         </View>
+        {isActive && (
+          <View style={styles.activeBadge}>
+            <Text style={styles.activeText}>En cours</Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.content}>
@@ -59,7 +71,9 @@ export const ParcoursCard: React.FC<ParcoursCardProps> = ({
 
           <View style={styles.infoItem}>
             <Text style={styles.infoIcon}>⏱️</Text>
-            <Text style={styles.infoText}>{parcours.estimatedDuration || 0} min</Text>
+            <Text style={styles.infoText}>
+              {parcours.estimatedDuration || 0} min
+            </Text>
           </View>
 
           <View style={styles.infoItem}>
@@ -67,6 +81,18 @@ export const ParcoursCard: React.FC<ParcoursCardProps> = ({
             <Text style={styles.infoText}>{difficulty}</Text>
           </View>
         </View>
+
+        {isActive && onAbandon && (
+          <TouchableOpacity
+            style={styles.abandonButton}
+            onPress={e => {
+              e.stopPropagation();
+              onAbandon();
+            }}
+          >
+            <Text style={styles.abandonText}>Abandonner</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -116,6 +142,20 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontWeight: '600',
   },
+  activeBadge: {
+    position: 'absolute',
+    top: spacing.sm,
+    left: spacing.sm,
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: 8,
+  },
+  activeText: {
+    ...typography.caption,
+    color: colors.white,
+    fontWeight: '700',
+  },
   content: {
     padding: spacing.md,
   },
@@ -145,5 +185,18 @@ const styles = StyleSheet.create({
   infoText: {
     ...typography.caption,
     color: colors.gray600,
+  },
+  abandonButton: {
+    marginTop: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.error,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  abandonText: {
+    ...typography.button,
+    color: colors.white,
+    fontWeight: '600',
   },
 });

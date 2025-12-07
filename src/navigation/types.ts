@@ -11,12 +11,13 @@ export type AuthStackParamList = {
 };
 
 /**
- * Main Top Tabs Navigation
+ * Main Bottom Tabs Navigation
  */
 export type MainTabParamList = {
   Parcours: undefined;
   Carte: undefined;
-  Podcasts: undefined;
+  RewardsTab: undefined;
+  LeaderboardTab: undefined;
   Profil: undefined;
 };
 
@@ -26,9 +27,15 @@ export type MainTabParamList = {
 export type MainStackParamList = {
   MainTabs: undefined;
   ParcoursDetail: { parcoursId: number };
+  ParcoursTracking: { parcoursId: number; sessionId: number };
+  ParcoursCompletion: {
+    parcoursName: string;
+    distance: number;
+    duration: number;
+    pointsEarned: number;
+    poisVisited: number;
+  };
   Quiz: { quizId: number; quizTitle: string };
-  Rewards: undefined;
-  Leaderboard: undefined;
 };
 
 /**

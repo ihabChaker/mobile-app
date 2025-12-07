@@ -89,7 +89,9 @@ class ActivityService {
    * Obtenir toutes mes activités
    */
   async getMyActivities(): Promise<UserActivity[]> {
-    const response = await apiService.get<UserActivity[] | PaginatedResponse<UserActivity>>('/activities');
+    const response = await apiService.get<
+      UserActivity[] | PaginatedResponse<UserActivity>
+    >('/activities');
     const data = extractData(response);
     return data.map(transformActivity);
   }
@@ -112,8 +114,14 @@ class ActivityService {
   /**
    * Mettre à jour une activité
    */
-  async updateActivity(id: number, data: UpdateActivityDto): Promise<UserActivity> {
-    const result = await apiService.put<UserActivity>(`/activities/${id}`, data);
+  async updateActivity(
+    id: number,
+    data: UpdateActivityDto
+  ): Promise<UserActivity> {
+    const result = await apiService.put<UserActivity>(
+      `/activities/${id}`,
+      data
+    );
     return transformActivity(result);
   }
 
@@ -135,7 +143,9 @@ class ActivityService {
    * Obtenir mes visites de POI
    */
   async getMyPOIVisits(): Promise<POIVisit[]> {
-    const response = await apiService.get<POIVisit[] | PaginatedResponse<POIVisit>>('/activities/poi-visits/me');
+    const response = await apiService.get<
+      POIVisit[] | PaginatedResponse<POIVisit>
+    >('/activities/poi-visits/me');
     return extractData(response);
   }
 }

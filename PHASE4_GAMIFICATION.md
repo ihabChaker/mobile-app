@@ -17,9 +17,11 @@ La Phase 4 ajoute des fonctionnalités de gamification à l'application HistoRan
 ### 1. Services Backend
 
 #### QuizService (`src/services/quiz.service.ts`)
+
 Service pour la gestion des quiz historiques liés aux POIs.
 
 **Interfaces:**
+
 ```typescript
 interface QuizQuestion {
   id: number;
@@ -51,6 +53,7 @@ interface QuizStats {
 ```
 
 **Méthodes:**
+
 - `getQuestionsByPOI(poiId: number)` - Récupère toutes les questions pour un POI
 - `getQuestionById(id: number)` - Récupère une question spécifique
 - `submitAnswer(questionId, selectedAnswer)` - Soumet une réponse
@@ -58,6 +61,7 @@ interface QuizStats {
 - `getStats()` - Récupère les statistiques globales
 
 **Endpoints API:**
+
 - `GET /quiz/questions/poi/:poiId` - Questions par POI
 - `GET /quiz/questions/:id` - Question spécifique
 - `POST /quiz/answers` - Soumettre réponse
@@ -67,9 +71,11 @@ interface QuizStats {
 ---
 
 #### RewardService (`src/services/reward.service.ts`)
+
 Service pour la gestion des badges, défis, et leaderboard.
 
 **Interfaces:**
+
 ```typescript
 interface Badge {
   id: number;
@@ -120,6 +126,7 @@ interface LeaderboardEntry {
 ```
 
 **Méthodes:**
+
 - `getAllBadges()` - Liste tous les badges disponibles
 - `getMyBadges()` - Mes badges gagnés
 - `getActiveChallenges()` - Défis actifs disponibles
@@ -128,6 +135,7 @@ interface LeaderboardEntry {
 - `getLeaderboard(period?)` - Classement global
 
 **Endpoints API:**
+
 - `GET /rewards/badges` - Tous les badges
 - `GET /rewards/badges/me` - Mes badges
 - `GET /rewards/challenges` - Défis actifs
@@ -140,9 +148,11 @@ interface LeaderboardEntry {
 ### 2. Écrans
 
 #### QuizScreen (`src/screens/main/QuizScreen.tsx`) ✅ COMPLÉTÉ
+
 Écran de quiz interactif pour les POIs.
 
 **Fonctionnalités:**
+
 - ✅ Navigation avec paramètres (poiId, poiName)
 - ✅ Chargement des questions depuis QuizService
 - ✅ Header avec nom POI et barre de progression
@@ -158,6 +168,7 @@ interface LeaderboardEntry {
 - ✅ States: loading, empty, quiz en cours, complété
 
 **Workflow:**
+
 ```
 1. User clique "Tester mes connaissances" sur POI card
 2. → Navigation vers QuizScreen avec poiId
@@ -176,11 +187,13 @@ interface LeaderboardEntry {
 ```
 
 **Animations:**
+
 - Fade in modal (300ms)
 - Scale spring effect pour modal
 - Progress bar animée
 
 **Empty States:**
+
 - Pas de questions: "Aucun quiz disponible"
 - Loading: Spinner + "Chargement des questions..."
 
@@ -189,7 +202,9 @@ interface LeaderboardEntry {
 ### 3. Composants
 
 #### QRScanner (`src/components/QRScanner.tsx`) ✅ COMPLÉTÉ
+
 **Fonctionnalités:**
+
 - ✅ Système de tabs (Badges / Challenges)
 - ✅ Grid layout pour badges (2 colonnes, 47% width)
 - ✅ Liste avec cartes pour défis
@@ -205,6 +220,7 @@ interface LeaderboardEntry {
 - ✅ Challenge type labels traduits
 
 **Interface:**
+
 ```typescript
 interface RewardsScreenState {
   activeTab: 'badges' | 'challenges';
@@ -216,6 +232,7 @@ interface RewardsScreenState {
 ```
 
 **Sections:**
+
 1. **Badges Tab:**
    - Grid de badges avec icône, nom, rareté
    - Date d'obtention
@@ -236,9 +253,11 @@ interface RewardsScreenState {
 ### 3. Composants
 
 #### QRScanner (`src/components/QRScanner.tsx`)
+
 Composant de scan de QR Code pour la fonctionnalité "Treasure Hunt".
 
 **Fonctionnalités:**
+
 - ✅ Intégration expo-camera
 - ✅ Demande de permission caméra automatique
 - ✅ Scan area visuel avec corners animés
@@ -252,14 +271,16 @@ Composant de scan de QR Code pour la fonctionnalité "Treasure Hunt".
 - ✅ Error handling et fallbacks
 
 **Props:**
+
 ```typescript
 interface QRScannerProps {
-  onScan: (data: string) => void;  // Callback avec données QR
-  onClose: () => void;              // Callback fermeture
+  onScan: (data: string) => void; // Callback avec données QR
+  onClose: () => void; // Callback fermeture
 }
 ```
 
 **États:**
+
 - Permission non demandée (loading)
 - Permission refusée (error message)
 - Scan en cours (camera active)
@@ -267,9 +288,10 @@ interface QRScannerProps {
 - Web/device non supporté (info message)
 
 **Usage:**
+
 ```tsx
 <QRScanner
-  onScan={(qrData) => {
+  onScan={qrData => {
     // Traiter le code QR scanné
     console.log('QR Code:', qrData);
   }}
@@ -285,6 +307,7 @@ interface QRScannerProps {
 ## 📋 Fonctionnalités Restantes (15%)
 
 ### 1. QR Code Validation (Priorité Haute)
+
 Écran pour afficher et répondre aux quiz.
 
 ---
@@ -292,9 +315,11 @@ interface QRScannerProps {
 ## 📋 Fonctionnalités Restantes (15%)
 
 ### 1. QR Code Validation (Priorité Haute)
+
 Backend integration pour valider les QR codes scannés.
 
 **À implémenter:**
+
 - [ ] Endpoint POST /rewards/validate-qr avec code scanné
 - [ ] Vérification validité du code
 - [ ] Attribution récompense si valide
@@ -304,9 +329,11 @@ Backend integration pour valider les QR codes scannés.
 ---
 
 ### 2. LeaderboardScreen (Priorité Moyenne)
+
 Écran de classement global et par période.
 
 **À implémenter:**
+
 - [ ] Liste du top 100
 - [ ] Indicateur de position personnelle
 - [ ] Filtres par période (semaine/mois/année/all-time)
@@ -316,9 +343,11 @@ Backend integration pour valider les QR codes scannés.
 ---
 
 ### 4. Notifications (Priorité Basse)
+
 Système de notifications pour événements gamification.
 
 **À implémenter:**
+
 - [ ] Notification nouveau badge
 - [ ] Notification défi complété
 - [ ] Notification montée de niveau
@@ -330,6 +359,7 @@ Système de notifications pour événements gamification.
 ## 🔄 Flux Utilisateur
 
 ### 1. Parcours avec Quiz
+
 ```
 1. Utilisateur démarre parcours
 2. Visite POI
@@ -345,6 +375,7 @@ Système de notifications pour événements gamification.
 ---
 
 ### 3. Notifications (Priorité Basse)R codes"
+
 2. Clique sur défi → Instructions
 3. Trouve QR code sur terrain
 4. Ouvre scanner depuis ProfilScreen
@@ -353,6 +384,7 @@ Système de notifications pour événements gamification.
 7. → Validation backend
 8. → Progress défi +1
 9. Si complété → Badge + points
+
 ```
 
 ### 3. Système de Badges
@@ -360,6 +392,7 @@ Système de notifications pour événements gamification.
 
 ### 1. Parcours avec Quiz ✅ IMPLÉMENTÉ
 ```
+
 1. Utilisateur démarre parcours
 2. Visite POI (ParcoursDetailScreen)
 3. Voit bouton "❓ Tester mes connaissances"
@@ -369,10 +402,12 @@ Système de notifications pour événements gamification.
 7. Termine le quiz → Statistiques finales
 8. → Gagne points + éventuel badge
 9. Retour à ParcoursDetailScreen
+
 ```
 
 ### 2. Chasse au Trésor ✅ UI COMPLÈTE (Backend validation pending)
 ```
+
 1. Utilisateur ouvre ProfilScreen
 2. Clique "📱 Scanner QR Code"
 3. → Modal QRScanner plein écran
@@ -383,6 +418,7 @@ Système de notifications pour événements gamification.
 8. Alert affiche code détecté
 9. TODO: Validation backend
 10. TODO: Si valide → Badge + points
+
 ```
 
 ### 3. Système de Badges et Récompenses ✅ IMPLÉMENTÉon = (type: string) => {
@@ -402,21 +438,25 @@ Système de notifications pour événements gamification.
 ## 📦 Dépendances Ajoutées
 
 ### Phase 4 Dependencies
+
 ```json
 {
-  "expo-camera": "~17.0.9",  // Pour QR scanner
+  "expo-camera": "~17.0.9" // Pour QR scanner
 }
 ```
 
 ### DevDependencies (déjà présentes)
+
 - TypeScript avec strict mode
 - ESLint + Prettier
 - Types pour React Native
 
 ---
+
 ## 🧪 Tests Requis
 
 ### 1. Services ✅
+
 - ✅ QuizService.getQuestionsByPOI() retourne questions valides
 - ✅ QuizService.submitAnswer() envoie bonne requête
 - ✅ RewardService.getMyBadges() formate badges correctement
@@ -424,6 +464,7 @@ Système de notifications pour événements gamification.
 - ✅ Error handling pour tous les services
 
 ### 2. RewardsScreen ✅
+
 - ✅ Affichage correct badges avec rarités
 - ✅ Switch tabs fonctionne
 - ✅ Pull-to-refresh recharge données
@@ -431,6 +472,7 @@ Système de notifications pour événements gamification.
 - ✅ Progress bars challenges affichent bon %
 
 ### 3. QuizScreen ✅
+
 - ✅ Navigation avec paramètres fonctionne
 - ✅ Questions chargent correctement
 - ✅ Sélection réponse met à jour UI
@@ -440,9 +482,11 @@ Système de notifications pour événements gamification.
 - ✅ Écran final affiche bonnes stats
 - ✅ Empty state pour 0 questions
 - ✅ Loading state pendant chargement
+
 ## 🚀 Prochaines Étapes
 
 ### Immédiat (Sprint actuel)
+
 1. ✅ Services quiz et reward créés
 2. ✅ RewardsScreen implémenté
 3. ✅ QRScanner créé
@@ -454,12 +498,15 @@ Système de notifications pour événements gamification.
 9. **TODO:** Notifications push (expo-notifications)
 
 ### Sprint suivant
+
 1. Backend QR code validation
 2. Notifications push (expo-notifications)
 3. Tests end-to-end complets
 4. Polish animations et transitions
 5. Phase 5 - Social features
+
 ### 6. ParcoursDetailScreen ✅
+
 - ✅ Boutons quiz apparaissent sur POI cards
 - ✅ Navigation vers QuizScreen avec bons params
 - ✅ poiId et poiName passés correctement
@@ -470,6 +517,7 @@ Système de notifications pour événements gamification.
 ## 🚀 Prochaines Étapes
 
 ### Immédiat (Sprint actuel)
+
 1. ✅ Services quiz et reward créés
 2. ✅ RewardsScreen implémenté
 3. ✅ QRScanner créé
@@ -478,15 +526,17 @@ Système de notifications pour événements gamification.
 6. **TODO:** Intégrer QR scanner dans Profil
 
 ### Sprint suivant
+
 1. LeaderboardScreen
 2. Notifications push
 3. Tests end-to-end
 4. Polish animations
+
 ---
 
-**Contributeurs**: GitHub Copilot + Développeur  
 **Dernière mise à jour**: 1 Décembre 2025, 22:15  
 **Statut**: 🎉 95% complété - Quiz + Rewards + QR Scanner + Leaderboard tous implémentés!
+
 - Challenges entre amis
 
 ---
@@ -494,16 +544,19 @@ Système de notifications pour événements gamification.
 ## 📝 Notes Techniques
 
 ### Performance
+
 - Services utilisent caching pour badges/challenges
 - Images badges lazy-loaded
 - Pull-to-refresh ne recharge que si >30s depuis dernière charge
 
 ### Sécurité
+
 - Validation QR codes côté backend
 - Points/badges attribués uniquement par backend
 - Protection anti-cheat pour quiz (time limits)
 
 ### UX
+
 - Animations pour déblocage badges
 - Haptic feedback sur scan QR réussi
 - Confetti animation pour legendary badges
@@ -511,5 +564,4 @@ Système de notifications pour événements gamification.
 
 ---
 
-**Contributeurs**: GitHub Copilot + Développeur  
 **Dernière mise à jour**: 1 Décembre 2025, 20:30

@@ -24,8 +24,13 @@
       "package": "com.anonymous.mobileapp",
       "config": {
         "googleMaps": {
-          "apiKey": "AIzaSyBpmW5mt8qSh2cnIhIsi9U9EasqtEF91tU"
+          "apiKey": "___"
         }
+      },
+      "navigationBar": {
+        "visible": "leanback",
+        "barStyle": "dark-content",
+        "backgroundColor": "#ffffff"
       }
     },
     "web": {

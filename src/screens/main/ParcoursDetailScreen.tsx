@@ -8,16 +8,27 @@ import {
   Alert,
   TouchableOpacity,
   Image,
+  Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { MainStackParamList } from '@/navigation/types';
 import { colors, typography, spacing } from '@/theme';
 import parcoursService from '@/services/parcours.service';
-import activityService from '@/services/activity.service';
+import parcoursSessionService from '@/services/parcours-session.service';
 import poiService from '@/services/poi.service';
 import quizService, { Quiz } from '@/services/quiz.service';
 import { Parcours, POI } from '@/types/parcours.types';
+
+let Location: any = null;
+if (Platform.OS !== 'web') {
+  try {
+    Location = require('expo-location');
+  } catch {
+    // expo-location not available
+  }
+}
 
 type ParcoursDetailScreenProps = {
   navigation: NativeStackNavigationProp<MainStackParamList, 'ParcoursDetail'>;
@@ -54,7 +65,10 @@ export const ParcoursDetailScreen: React.FC<ParcoursDetailScreenProps> = ({
       setQuizzes(quizzesData);
       setPois(poisData);
     } catch (error: any) {
-      Alert.alert('Erreur', error.message || 'Impossible de charger le parcours');
+      Alert.alert(
+        'Erreur',
+        error.message || 'Impossible de charger le parcours'
+      );
       navigation.goBack();
     } finally {
       setIsLoading(false);
@@ -76,63 +90,160 @@ export const ParcoursDetailScreen: React.FC<ParcoursDetailScreenProps> = ({
   const handleStartParcours = async () => {
     if (!parcours) return;
 
-    Alert.alert(
-      'Démarrer le parcours',
-      `Êtes-vous prêt à commencer "${parcours.title}" ?`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Démarrer',
-          style: 'default',
-          onPress: async () => {
-            try {
-              setIsStarting(true);
-              // Utiliser le service d'activités selon l'API
-              await activityService.startActivity({ parcoursId: parcours.id });
-              Alert.alert(
-                'Parcours démarré !',
-                'Bonne randonnée ! Suivez les indications pour découvrir les points d\'intérêt.',
-                [{ text: 'OK' }]
-              );
-              // TODO: Navigate to active parcours tracking screen
-            } catch (error: any) {
-              Alert.alert('Erreur', error.message || 'Impossible de démarrer le parcours');
-            } finally {
-              setIsStarting(false);
-            }
+    try {
+      setIsStarting(true);
+
+      // Check for active sessions first
+      const activeSessions = await parcoursSessionService.getActiveSessions();
+      if (activeSessions && activeSessions.length > 0) {
+        Alert.alert(
+          'Parcours déjà actif',
+          "Vous avez déjà un parcours en cours. Veuillez le terminer ou l'abandonner avant d'en commencer un nouveau.",
+          [{ text: 'OK' }]
+        );
+        setIsStarting(false);
+        return;
+      }
+
+      // Get current location
+      if (!Location) {
+        Alert.alert('Erreur', "La géolocalisation n'est pas disponible");
+        setIsStarting(false);
+        return;
+      }
+
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission refusée',
+          'Vous devez autoriser la localisation pour démarrer un parcours'
+        );
+        setIsStarting(false);
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({});
+      const currentLocation = {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      };
+
+      const startPoint = {
+        latitude:
+          parcours.startingPointLat || parcours.startPoint?.latitude || 0,
+        longitude:
+          parcours.startingPointLon || parcours.startPoint?.longitude || 0,
+      };
+
+      // Calculate distance to start point
+      const distanceToStart = calculateDistance(currentLocation, startPoint);
+      const maxDistance = 100; // 100 meters
+
+      if (distanceToStart > maxDistance) {
+        Alert.alert(
+          'Trop loin du départ',
+          `Vous êtes à ${(distanceToStart / 1000).toFixed(2)} km du point de départ. Vous devez être à moins de ${maxDistance}m pour démarrer le parcours.`,
+          [{ text: 'OK' }]
+        );
+        setIsStarting(false);
+        return;
+      }
+
+      // All checks passed, show confirmation
+      Alert.alert(
+        'Démarrer le parcours',
+        `Êtes-vous prêt à commencer "${parcours.title}" ?`,
+        [
+          {
+            text: 'Annuler',
+            style: 'cancel',
+            onPress: () => setIsStarting(false),
           },
-        },
-      ]
-    );
+          {
+            text: 'Démarrer',
+            style: 'default',
+            onPress: async () => {
+              try {
+                // Start a new parcours session
+                const session = await parcoursSessionService.startSession({
+                  parcoursId: parcours.id,
+                  startLat: Number(startPoint.latitude),
+                  startLon: Number(startPoint.longitude),
+                });
+
+                // Navigate to tracking screen with session ID
+                navigation.navigate('ParcoursTracking', {
+                  parcoursId: parcours.id,
+                  sessionId: session.id,
+                });
+              } catch (error: any) {
+                Alert.alert(
+                  'Erreur',
+                  error.message || 'Impossible de démarrer le parcours'
+                );
+              } finally {
+                setIsStarting(false);
+              }
+            },
+          },
+        ]
+      );
+    } catch (error: any) {
+      Alert.alert(
+        'Erreur',
+        error.message || 'Impossible de vérifier la localisation'
+      );
+      setIsStarting(false);
+    }
+  };
+
+  // Helper function to calculate distance between two points in meters
+  const calculateDistance = (
+    point1: { latitude: number; longitude: number },
+    point2: { latitude: number; longitude: number }
+  ): number => {
+    const R = 6371e3; // Earth's radius in meters
+    const φ1 = (point1.latitude * Math.PI) / 180;
+    const φ2 = (point2.latitude * Math.PI) / 180;
+    const Δφ = ((point2.latitude - point1.latitude) * Math.PI) / 180;
+    const Δλ = ((point2.longitude - point1.longitude) * Math.PI) / 180;
+
+    const a =
+      Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c; // Distance in meters
   };
 
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
+      <SafeAreaView style={styles.loadingContainer} edges={['top', 'bottom']}>
         <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Chargement du parcours...</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (!parcours) {
     return (
-      <View style={styles.errorContainer}>
+      <SafeAreaView style={styles.errorContainer} edges={['top', 'bottom']}>
         <Text style={styles.errorIcon}>⚠️</Text>
         <Text style={styles.errorText}>Parcours non trouvé</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   const difficulty = parcours.difficulty || 'moyen';
-  const difficultyColor = {
-    facile: colors.success,
-    moyen: colors.warning,
-    difficile: colors.error,
-  }[difficulty] || colors.gray500;
+  const difficultyColor =
+    {
+      facile: colors.success,
+      moyen: colors.warning,
+      difficile: colors.error,
+    }[difficulty] || colors.gray500;
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Image Header */}
         <View style={styles.imageContainer}>
@@ -147,17 +258,27 @@ export const ParcoursDetailScreen: React.FC<ParcoursDetailScreenProps> = ({
               <Text style={styles.placeholderIcon}>🗺️</Text>
             </View>
           )}
-          <View style={[styles.difficultyBadge, { backgroundColor: difficultyColor }]}>
+          <View
+            style={[
+              styles.difficultyBadge,
+              { backgroundColor: difficultyColor },
+            ]}
+          >
             <Text style={styles.difficultyText}>
-              {(parcours.difficulty || 'moyen').charAt(0).toUpperCase() + (parcours.difficulty || 'moyen').slice(1)}
+              {(parcours.difficulty || 'moyen').charAt(0).toUpperCase() +
+                (parcours.difficulty || 'moyen').slice(1)}
             </Text>
           </View>
         </View>
 
         {/* Content */}
         <View style={styles.content}>
-          <Text style={styles.title}>{parcours.title || 'Parcours sans titre'}</Text>
-          <Text style={styles.description}>{parcours.description || 'Aucune description disponible'}</Text>
+          <Text style={styles.title}>
+            {parcours.title || 'Parcours sans titre'}
+          </Text>
+          <Text style={styles.description}>
+            {parcours.description || 'Aucune description disponible'}
+          </Text>
 
           {/* Stats Grid */}
           <View style={styles.statsGrid}>
@@ -169,13 +290,17 @@ export const ParcoursDetailScreen: React.FC<ParcoursDetailScreenProps> = ({
 
             <View style={styles.statBox}>
               <Text style={styles.statIcon}>⏱️</Text>
-              <Text style={styles.statValue}>{parcours.estimatedDuration || 0} min</Text>
+              <Text style={styles.statValue}>
+                {parcours.estimatedDuration || 0} min
+              </Text>
               <Text style={styles.statLabel}>Durée</Text>
             </View>
 
             <View style={styles.statBox}>
               <Text style={styles.statIcon}>🎯</Text>
-              <Text style={styles.statValue}>{parcours.difficulty || 'moyen'}</Text>
+              <Text style={styles.statValue}>
+                {parcours.difficulty || 'moyen'}
+              </Text>
               <Text style={styles.statLabel}>Difficulté</Text>
             </View>
           </View>
@@ -186,7 +311,9 @@ export const ParcoursDetailScreen: React.FC<ParcoursDetailScreenProps> = ({
             {pois.length > 0 ? (
               <>
                 <Text style={styles.sectionText}>
-                  Ce parcours comprend {pois.length} point{pois.length > 1 ? 's' : ''} d'intérêt historique{pois.length > 1 ? 's' : ''}.
+                  Ce parcours comprend {pois.length} point
+                  {pois.length > 1 ? 's' : ''} d'intérêt historique
+                  {pois.length > 1 ? 's' : ''}.
                 </Text>
                 <View style={styles.poisList}>
                   {pois.map((poi, index) => (
@@ -196,7 +323,9 @@ export const ParcoursDetailScreen: React.FC<ParcoursDetailScreenProps> = ({
                         <View style={styles.poiInfo}>
                           <Text style={styles.poiName}>{poi.name}</Text>
                           <Text style={styles.poiType}>
-                            {getPoiTypeIcon(poi.type)} {poi.type.charAt(0).toUpperCase() + poi.type.slice(1)}
+                            {getPoiTypeIcon(poi.type)}{' '}
+                            {poi.type.charAt(0).toUpperCase() +
+                              poi.type.slice(1)}
                           </Text>
                         </View>
                       </View>
@@ -204,7 +333,9 @@ export const ParcoursDetailScreen: React.FC<ParcoursDetailScreenProps> = ({
                         {poi.description}
                       </Text>
                       {poi.visitDuration && (
-                        <Text style={styles.poiDuration}>⏱️ ~{poi.visitDuration} min</Text>
+                        <Text style={styles.poiDuration}>
+                          ⏱️ ~{poi.visitDuration} min
+                        </Text>
                       )}
                     </View>
                   ))}
@@ -227,7 +358,7 @@ export const ParcoursDetailScreen: React.FC<ParcoursDetailScreenProps> = ({
               <Text style={styles.sectionText}>
                 Testez vos connaissances sur ce parcours !
               </Text>
-              {quizzes.map((quiz) => (
+              {quizzes.map(quiz => (
                 <TouchableOpacity
                   key={quiz.id}
                   style={styles.quizCard}
@@ -244,10 +375,19 @@ export const ParcoursDetailScreen: React.FC<ParcoursDetailScreenProps> = ({
                       {quiz.description || 'Aucune description'}
                     </Text>
                     <View style={styles.quizMeta}>
-                      <Text style={[
-                        styles.quizDifficulty,
-                        { color: quiz.difficulty === 'facile' ? colors.success : quiz.difficulty === 'difficile' ? colors.error : colors.warning }
-                      ]}>
+                      <Text
+                        style={[
+                          styles.quizDifficulty,
+                          {
+                            color:
+                              quiz.difficulty === 'facile'
+                                ? colors.success
+                                : quiz.difficulty === 'difficile'
+                                  ? colors.error
+                                  : colors.warning,
+                          },
+                        ]}
+                      >
                         {quiz.difficulty}
                       </Text>
                       <Text style={styles.quizQuestions}>
@@ -264,7 +404,8 @@ export const ParcoursDetailScreen: React.FC<ParcoursDetailScreenProps> = ({
           <View style={styles.section}>
             <View style={styles.infoBox}>
               <Text style={styles.infoText}>
-                💡 Astuce : Activez votre GPS pour être guidé vers chaque point d'intérêt
+                💡 Astuce : Activez votre GPS pour être guidé vers chaque point
+                d'intérêt
               </Text>
             </View>
           </View>
@@ -278,7 +419,8 @@ export const ParcoursDetailScreen: React.FC<ParcoursDetailScreenProps> = ({
                 <View style={styles.routeContent}>
                   <Text style={styles.routeLabel}>Départ</Text>
                   <Text style={styles.routeText}>
-                    Lat: {parcours.startPoint?.latitude?.toFixed(4) ?? 'N/A'}, Long: {parcours.startPoint?.longitude?.toFixed(4) ?? 'N/A'}
+                    Lat: {parcours.startPoint?.latitude?.toFixed(4) ?? 'N/A'},
+                    Long: {parcours.startPoint?.longitude?.toFixed(4) ?? 'N/A'}
                   </Text>
                 </View>
               </View>
@@ -290,7 +432,8 @@ export const ParcoursDetailScreen: React.FC<ParcoursDetailScreenProps> = ({
                 <View style={styles.routeContent}>
                   <Text style={styles.routeLabel}>Arrivée</Text>
                   <Text style={styles.routeText}>
-                    Lat: {parcours.endPoint?.latitude?.toFixed(4) ?? 'N/A'}, Long: {parcours.endPoint?.longitude?.toFixed(4) ?? 'N/A'}
+                    Lat: {parcours.endPoint?.latitude?.toFixed(4) ?? 'N/A'},
+                    Long: {parcours.endPoint?.longitude?.toFixed(4) ?? 'N/A'}
                   </Text>
                 </View>
               </View>
@@ -303,19 +446,27 @@ export const ParcoursDetailScreen: React.FC<ParcoursDetailScreenProps> = ({
             <View style={styles.recommendationsList}>
               <View style={styles.recommendationItem}>
                 <Text style={styles.recommendationIcon}>✅</Text>
-                <Text style={styles.recommendationText}>Prévoyez de l'eau et des en-cas</Text>
+                <Text style={styles.recommendationText}>
+                  Prévoyez de l'eau et des en-cas
+                </Text>
               </View>
               <View style={styles.recommendationItem}>
                 <Text style={styles.recommendationIcon}>✅</Text>
-                <Text style={styles.recommendationText}>Portez des chaussures confortables</Text>
+                <Text style={styles.recommendationText}>
+                  Portez des chaussures confortables
+                </Text>
               </View>
               <View style={styles.recommendationItem}>
                 <Text style={styles.recommendationIcon}>✅</Text>
-                <Text style={styles.recommendationText}>Rechargez votre téléphone</Text>
+                <Text style={styles.recommendationText}>
+                  Rechargez votre téléphone
+                </Text>
               </View>
               <View style={styles.recommendationItem}>
                 <Text style={styles.recommendationIcon}>✅</Text>
-                <Text style={styles.recommendationText}>Vérifiez la météo avant de partir</Text>
+                <Text style={styles.recommendationText}>
+                  Vérifiez la météo avant de partir
+                </Text>
               </View>
             </View>
           </View>
@@ -342,7 +493,7 @@ export const ParcoursDetailScreen: React.FC<ParcoursDetailScreenProps> = ({
           )}
         </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
   );
 };
 

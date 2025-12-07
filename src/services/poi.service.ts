@@ -9,7 +9,9 @@ class POIService {
    * Lister les POI d'un parcours
    */
   async getPOIsByParcours(parcoursId: number): Promise<POI[]> {
-    const response = await apiService.get<POI[] | PaginatedResponse<POI>>(`/poi/parcours/${parcoursId}`);
+    const response = await apiService.get<POI[] | PaginatedResponse<POI>>(
+      `/poi/parcours/${parcoursId}`
+    );
     const data = extractData(response);
     return data.map(transformPOI);
   }
@@ -20,6 +22,23 @@ class POIService {
   async getPOIById(id: number): Promise<POI> {
     const data = await apiService.get<POI>(`/poi/${id}`);
     return transformPOI(data);
+  }
+
+  /**
+   * Enregistrer une visite de POI
+   */
+  async recordVisit(
+    poiId: number,
+    data: { latitude: number; longitude: number; activityId?: number }
+  ): Promise<any> {
+    return apiService.post(`/activities/poi-visits`, {
+      poiId,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      activityId: data.activityId,
+      scannedQr: false,
+      listenedAudio: false,
+    });
   }
 }
 

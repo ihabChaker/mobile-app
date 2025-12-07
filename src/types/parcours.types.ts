@@ -41,7 +41,13 @@ export interface POI {
   parcoursId: number;
   name: string;
   description: string;
-  poiType: 'bunker' | 'blockhaus' | 'memorial' | 'museum' | 'beach' | 'monument';
+  poiType:
+    | 'bunker'
+    | 'blockhaus'
+    | 'memorial'
+    | 'museum'
+    | 'beach'
+    | 'monument';
   latitude: number;
   longitude: number;
   historicalPeriod?: string;
@@ -49,6 +55,10 @@ export interface POI {
   qrCode?: string;
   imageUrl?: string;
   audioUrl?: string;
+  // Content relationships
+  quizId?: number;
+  treasureHuntId?: number;
+  podcastId?: number;
   // Computed property for convenience
   coordinates?: Coordinates;
   // Alias for backwards compatibility - required for type safety
@@ -75,8 +85,13 @@ export interface Podcast {
 /**
  * Maps backend difficulty level to French display value
  */
-export const mapDifficultyToFrench = (level: Parcours['difficultyLevel']): 'facile' | 'moyen' | 'difficile' => {
-  const mapping: Record<Parcours['difficultyLevel'], 'facile' | 'moyen' | 'difficile'> = {
+export const mapDifficultyToFrench = (
+  level: Parcours['difficultyLevel']
+): 'facile' | 'moyen' | 'difficile' => {
+  const mapping: Record<
+    Parcours['difficultyLevel'],
+    'facile' | 'moyen' | 'difficile'
+  > = {
     easy: 'facile',
     medium: 'moyen',
     hard: 'difficile',
@@ -115,7 +130,7 @@ export const transformParcours = (p: Parcours): Parcours => {
     difficulty: mapDifficultyToFrench(p.difficultyLevel),
     startPoint,
     endPoint: startPoint, // Use start point as end point if not specified
-    geoJsonPath: p.gpxFileUrl,
+    geoJsonPath: p.geoJsonPath || p.gpxFileUrl, // Use geoJsonPath if available, fallback to gpxFileUrl
   };
 };
 

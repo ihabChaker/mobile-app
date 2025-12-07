@@ -10,7 +10,7 @@ import {
   Image,
   Modal,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, typography, spacing } from '@/theme';
 import podcastService from '@/services/podcast.service';
 import { AudioPlayer } from '@/components/AudioPlayer';
@@ -21,7 +21,6 @@ import { Podcast } from '@/types/parcours.types';
  * Liste tous les podcasts disponibles
  */
 export const PodcastScreen: React.FC = () => {
-  const insets = useSafeAreaInsets();
   const [podcasts, setPodcasts] = useState<Podcast[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -38,7 +37,10 @@ export const PodcastScreen: React.FC = () => {
       const data = await podcastService.getAllPodcasts();
       setPodcasts(data);
     } catch (error: any) {
-      Alert.alert('Erreur', error.message || 'Impossible de charger les podcasts');
+      Alert.alert(
+        'Erreur',
+        error.message || 'Impossible de charger les podcasts'
+      );
     } finally {
       setIsLoading(false);
     }
@@ -89,7 +91,8 @@ export const PodcastScreen: React.FC = () => {
         </Text>
         <View style={styles.podcastFooter}>
           <Text style={styles.podcastDuration}>
-            ⏱️ {Math.floor(item.durationSeconds / 60)}:{String(item.durationSeconds % 60).padStart(2, '0')}
+            ⏱️ {Math.floor(item.durationSeconds / 60)}:
+            {String(item.durationSeconds % 60).padStart(2, '0')}
           </Text>
           {item.narrator && (
             <Text style={styles.podcastAuthor}>🎙️ {item.narrator}</Text>
@@ -105,38 +108,39 @@ export const PodcastScreen: React.FC = () => {
 
   if (isLoading) {
     return (
-      <View style={[styles.loadingContainer, { paddingTop: insets.top }]}>
+      <SafeAreaView style={styles.loadingContainer} edges={['top', 'bottom']}>
         <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Chargement des podcasts...</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (podcasts.length === 0) {
     return (
-      <View style={[styles.emptyContainer, { paddingTop: insets.top }]}>
+      <SafeAreaView style={styles.emptyContainer} edges={['top', 'bottom']}>
         <Text style={styles.emptyIcon}>🎧</Text>
         <Text style={styles.emptyTitle}>Aucun podcast disponible</Text>
         <Text style={styles.emptyText}>
           Les podcasts seront ajoutés prochainement.
         </Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + spacing.lg }]}>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.header}>
         <Text style={styles.headerTitle}>🎧 Podcasts Historiques</Text>
         <Text style={styles.headerSubtitle}>
-          {podcasts.length} podcast{podcasts.length > 1 ? 's' : ''} disponible{podcasts.length > 1 ? 's' : ''}
+          {podcasts.length} podcast{podcasts.length > 1 ? 's' : ''} disponible
+          {podcasts.length > 1 ? 's' : ''}
         </Text>
       </View>
 
       <FlatList
         data={podcasts}
         renderItem={renderPodcastItem}
-        keyExtractor={(item) => item.id.toString()}
+        keyExtractor={item => item.id.toString()}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshing={refreshing}
@@ -161,7 +165,7 @@ export const PodcastScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -192,6 +196,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: spacing.md,
+    paddingBottom: 100, // Space for floating tab bar
   },
   podcastCard: {
     backgroundColor: colors.surface,

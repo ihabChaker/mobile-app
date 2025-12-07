@@ -1,9 +1,28 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import { store } from '@/store/store';
 import { logout } from '@/store/slices/authSlice';
+import Constants from 'expo-constants';
 
-// URL de base de l'API backend
-const API_BASE_URL = 'https://histo-rando-backend-egvh3.ondigitalocean.app/api/v1';
+// URL de base de l'API backend - chargée depuis les variables d'environnement
+const API_BASE_URL =
+  Constants.expoConfig?.extra?.apiUrl ||
+  process.env.EXPO_PUBLIC_API_URL ||
+  'http://localhost:3000/api/v1';
+
+console.log('========================================');
+console.log('🔗 API Configuration');
+console.log('========================================');
+console.log('Base URL:', API_BASE_URL);
+console.log(
+  'Source:',
+  Constants.expoConfig?.extra?.apiUrl ? 'app.config' : 'env'
+);
+console.log('========================================');
+console.log('💡 For physical device:');
+console.log('   Update EXPO_PUBLIC_API_URL in .env');
+console.log('   Use your computer IP (e.g., 192.168.1.100)');
+console.log('   See NETWORK_SETUP.md for help');
+console.log('========================================');
 
 /**
  * Interface pour les réponses paginées
@@ -50,6 +69,18 @@ class ApiService {
       headers: {
         'Content-Type': 'application/json',
       },
+      paramsSerializer: {
+        serialize: params => {
+          // Ensure numbers are sent as strings in query params
+          const searchParams = new URLSearchParams();
+          Object.entries(params).forEach(([key, value]) => {
+            if (value !== undefined && value !== null) {
+              searchParams.append(key, String(value));
+            }
+          });
+          return searchParams.toString();
+        },
+      },
     });
 
     this.setupInterceptors();
@@ -66,6 +97,15 @@ class ApiService {
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
         }
+
+        // Log all requests for debugging
+        console.log(
+          `📤 API Request: ${config.method?.toUpperCase()} ${config.url}`
+        );
+        if (config.params) {
+          console.log('  Params:', JSON.stringify(config.params));
+        }
+
         return config;
       },
       error => {
@@ -75,8 +115,19 @@ class ApiService {
 
     // Interceptor pour les réponses
     this.api.interceptors.response.use(
-      response => response,
+      response => {
+        console.log(
+          `📥 API Response: ${response.status} ${response.config.url}`
+        );
+        return response;
+      },
       (error: AxiosError) => {
+        console.error(`❌ API Error: ${error.config?.url}`, {
+          status: error.response?.status,
+          data: error.response?.data,
+          message: error.message,
+        });
+
         // Gérer les erreurs 401 (non authentifié)
         if (error.response?.status === 401) {
           store.dispatch(logout());
@@ -92,6 +143,7 @@ class ApiService {
           message: errorMessage,
           statusCode: error.response?.status || 500,
           error: error.response?.statusText || 'Internal Server Error',
+          details: error.response?.data,
         });
       }
     );

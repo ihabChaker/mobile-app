@@ -9,17 +9,16 @@ import {
   Alert,
   Image,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, typography, spacing } from '@/theme';
 import rewardService from '@/services/reward.service';
-import { UserBadge, UserChallenge } from '@/services/reward.service';
+import { UserBadge, UserChallenge } from '@/types/backend.types';
 
 /**
  * Écran Récompenses - Phase 4
  * Affiche les badges et challenges de l'utilisateur
  */
 export const RewardsScreen: React.FC = () => {
-  const insets = useSafeAreaInsets();
   const [badges, setBadges] = useState<UserBadge[]>([]);
   const [challenges, setChallenges] = useState<UserChallenge[]>([]);
   const [availableChallenges, setAvailableChallenges] = useState<any[]>([]);
@@ -33,16 +32,39 @@ export const RewardsScreen: React.FC = () => {
   const loadRewards = async () => {
     try {
       setIsLoading(true);
+      console.log('🏆 Loading rewards...');
+
       const [badgesData, challengesData, availableData] = await Promise.all([
-        rewardService.getMyBadges(),
-        rewardService.getMyChallenges(),
-        rewardService.getActiveChallenges(),
+        rewardService.getMyBadges().catch(err => {
+          console.error('❌ Error loading badges:', err);
+          throw err;
+        }),
+        rewardService.getMyChallenges().catch(err => {
+          console.error('❌ Error loading my challenges:', err);
+          throw err;
+        }),
+        rewardService.getActiveChallenges().catch(err => {
+          console.error('❌ Error loading active challenges:', err);
+          throw err;
+        }),
       ]);
+
+      console.log('✅ Badges loaded:', badgesData.length);
+      console.log('✅ My challenges loaded:', challengesData.length);
+      console.log(
+        '✅ Available challenges loaded:',
+        availableData?.length || 0
+      );
+
       setBadges(badgesData);
       setChallenges(challengesData);
       setAvailableChallenges(availableData || []);
     } catch (error: any) {
-      Alert.alert('Erreur', error.message || 'Impossible de charger les récompenses');
+      console.error('❌ Rewards loading error:', error);
+      Alert.alert(
+        'Erreur',
+        `${error.message || 'Impossible de charger les récompenses'}\n\nDétails: ${JSON.stringify(error, null, 2)}`
+      );
     } finally {
       setIsLoading(false);
     }
@@ -50,11 +72,14 @@ export const RewardsScreen: React.FC = () => {
 
   const handleStartChallenge = async (challengeId: number) => {
     try {
-      await rewardService.startChallenge(challengeId);
-      Alert.alert('Succès', 'Challenge démarré avec succès !');
+      await rewardService.acceptChallenge(challengeId);
+      Alert.alert('Succès', 'Challenge accepté avec succès !');
       await loadRewards(); // Refresh the data
     } catch (error: any) {
-      Alert.alert('Erreur', error.message || 'Impossible de démarrer le challenge');
+      Alert.alert(
+        'Erreur',
+        error.message || "Impossible d'accepter le challenge"
+      );
     }
   };
 
@@ -88,49 +113,55 @@ export const RewardsScreen: React.FC = () => {
 
     return (
       <View style={styles.badgesGrid}>
-        {badges.map((userBadge) => (
-          <View key={userBadge.id} style={styles.badgeCard}>
-            <View
-              style={[
-                styles.badgeIconContainer,
-                { borderColor: getRarityColor(userBadge.badge.rarity) },
-              ]}
-            >
-              {userBadge.badge.iconUrl ? (
-                <Image
-                  source={{ uri: userBadge.badge.iconUrl }}
-                  style={styles.badgeIcon}
-                  resizeMode="contain"
-                />
-              ) : (
-                <Text style={styles.badgeIconPlaceholder}>🏅</Text>
-              )}
+        {badges
+          .filter(userBadge => userBadge.badge)
+          .map(userBadge => (
+            <View key={userBadge.id} style={styles.badgeCard}>
+              <View
+                style={[
+                  styles.badgeIconContainer,
+                  { borderColor: getRarityColor(userBadge.badge!.rarity) },
+                ]}
+              >
+                {userBadge.badge!.iconUrl ? (
+                  <Image
+                    source={{ uri: userBadge.badge!.iconUrl }}
+                    style={styles.badgeIcon}
+                    resizeMode="contain"
+                  />
+                ) : (
+                  <Text style={styles.badgeIconPlaceholder}>🏅</Text>
+                )}
+              </View>
+              <Text style={styles.badgeName} numberOfLines={2}>
+                {userBadge.badge!.name}
+              </Text>
+              <Text style={styles.badgePoints}>
+                +{userBadge.badge!.points} pts
+              </Text>
+              <Text
+                style={[
+                  styles.badgeRarity,
+                  { color: getRarityColor(userBadge.badge!.rarity) },
+                ]}
+              >
+                {userBadge.badge!.rarity}
+              </Text>
             </View>
-            <Text style={styles.badgeName} numberOfLines={2}>
-              {userBadge.badge.name}
-            </Text>
-            <Text style={styles.badgePoints}>+{userBadge.badge.points} pts</Text>
-            <Text
-              style={[
-                styles.badgeRarity,
-                { color: getRarityColor(userBadge.badge.rarity) },
-              ]}
-            >
-              {userBadge.badge.rarity}
-            </Text>
-          </View>
-        ))}
+          ))}
       </View>
     );
   };
 
   const renderChallenges = () => {
     // Get the IDs of already started challenges
-    const startedChallengeIds = challenges.map((uc) => uc.challenge.id);
-    
+    const startedChallengeIds = challenges
+      .map(uc => uc.challenge?.id)
+      .filter(Boolean);
+
     // Filter available challenges to exclude already started ones
     const unStartedChallenges = (availableChallenges || []).filter(
-      (challenge) => !startedChallengeIds.includes(challenge.id)
+      challenge => !startedChallengeIds.includes(challenge.id)
     );
 
     if (challenges.length === 0 && unStartedChallenges.length === 0) {
@@ -148,9 +179,11 @@ export const RewardsScreen: React.FC = () => {
     return (
       <View style={styles.challengesList}>
         {/* Active/Started Challenges */}
-        {challenges.map((userChallenge) => {
-          const progress =
-            (userChallenge.progress / userChallenge.challenge.target) * 100;
+        {challenges.map(userChallenge => {
+          if (!userChallenge.challenge) return null;
+
+          const progress = userChallenge.progress || 0; // Progress is a percentage (0-100)
+          const isCompleted = userChallenge.status === 'completed';
 
           return (
             <View key={userChallenge.id} style={styles.challengeCard}>
@@ -163,7 +196,7 @@ export const RewardsScreen: React.FC = () => {
                     {userChallenge.challenge.description}
                   </Text>
                 </View>
-                {userChallenge.isCompleted && (
+                {isCompleted && (
                   <View style={styles.completedBadge}>
                     <Text style={styles.completedIcon}>✓</Text>
                   </View>
@@ -177,7 +210,7 @@ export const RewardsScreen: React.FC = () => {
                       styles.progressFill,
                       {
                         width: `${Math.min(progress, 100)}%`,
-                        backgroundColor: userChallenge.isCompleted
+                        backgroundColor: isCompleted
                           ? colors.success
                           : colors.primary,
                       },
@@ -185,17 +218,17 @@ export const RewardsScreen: React.FC = () => {
                   />
                 </View>
                 <Text style={styles.progressText}>
-                  {userChallenge.progress} / {userChallenge.challenge.target}
+                  {Math.round(progress)}% complété
                 </Text>
               </View>
 
               <View style={styles.challengeFooter}>
                 <Text style={styles.challengeType}>
-                  {getChallengeTypeIcon(userChallenge.challenge.type)}{' '}
-                  {getChallengeTypeLabel(userChallenge.challenge.type)}
+                  {getChallengeTypeIcon(userChallenge.challenge.challengeType)}{' '}
+                  {getChallengeTypeLabel(userChallenge.challenge.challengeType)}
                 </Text>
                 <Text style={styles.challengeReward}>
-                  🎁 +{userChallenge.challenge.reward} pts
+                  🎁 +{userChallenge.challenge.pointsReward} pts
                 </Text>
               </View>
             </View>
@@ -203,7 +236,7 @@ export const RewardsScreen: React.FC = () => {
         })}
 
         {/* Available Challenges (not started) */}
-        {unStartedChallenges.map((challenge) => (
+        {unStartedChallenges.map(challenge => (
           <View key={`available-${challenge.id}`} style={styles.challengeCard}>
             <View style={styles.challengeHeader}>
               <View style={styles.challengeInfo}>
@@ -219,17 +252,17 @@ export const RewardsScreen: React.FC = () => {
 
             <View style={styles.challengeDetails}>
               <Text style={styles.challengeTarget}>
-                🎯 Objectif: {challenge.target}
+                🔥 Difficulté: x{challenge.difficultyMultiplier}
               </Text>
             </View>
 
             <View style={styles.challengeFooter}>
               <Text style={styles.challengeType}>
-                {getChallengeTypeIcon(challenge.type)}{' '}
-                {getChallengeTypeLabel(challenge.type)}
+                {getChallengeTypeIcon(challenge.challengeType)}{' '}
+                {getChallengeTypeLabel(challenge.challengeType)}
               </Text>
               <Text style={styles.challengeReward}>
-                🎁 +{challenge.reward} pts
+                🎁 +{challenge.pointsReward} pts
               </Text>
             </View>
 
@@ -248,10 +281,9 @@ export const RewardsScreen: React.FC = () => {
   const getChallengeTypeIcon = (type: string): string => {
     const icons: Record<string, string> = {
       distance: '🚶',
-      duration: '⏱️',
-      poi_visits: '📍',
-      quiz_score: '🧠',
-      streak: '🔥',
+      time: '⏱️',
+      weighted_backpack: '🎒',
+      period_clothing: '👔',
     };
     return icons[type] || '🎯';
   };
@@ -259,67 +291,78 @@ export const RewardsScreen: React.FC = () => {
   const getChallengeTypeLabel = (type: string): string => {
     const labels: Record<string, string> = {
       distance: 'Distance',
-      duration: 'Durée',
-      poi_visits: 'POI visités',
-      quiz_score: 'Score quiz',
-      streak: 'Série',
+      time: 'Temps',
+      weighted_backpack: 'Sac lesté',
+      period_clothing: "Vêtements d'époque",
     };
     return labels[type] || type;
   };
 
   if (isLoading) {
     return (
-      <View style={[styles.loadingContainer, { paddingTop: insets.top }]}>
+      <SafeAreaView style={styles.loadingContainer} edges={['top', 'bottom']}>
         <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Chargement des récompenses...</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
+  const hasChallenges =
+    challenges.length > 0 ||
+    (availableChallenges && availableChallenges.length > 0);
+
   return (
-    <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + spacing.lg }]}>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.header}>
         <Text style={styles.headerTitle}>🏆 Mes Récompenses</Text>
         <Text style={styles.headerSubtitle}>
-          {badges.length} badge{badges.length > 1 ? 's' : ''} • {challenges.length}{' '}
-          challenge{challenges.length > 1 ? 's' : ''}
+          {badges.length} badge{badges.length > 1 ? 's' : ''}
+          {hasChallenges &&
+            ` • ${challenges.length} challenge${challenges.length > 1 ? 's' : ''}`}
         </Text>
       </View>
 
-      <View style={styles.tabs}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'badges' && styles.tabActive]}
-          onPress={() => setActiveTab('badges')}
-        >
-          <Text
-            style={[styles.tabText, activeTab === 'badges' && styles.tabTextActive]}
+      {hasChallenges && (
+        <View style={styles.tabs}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'badges' && styles.tabActive]}
+            onPress={() => setActiveTab('badges')}
           >
-            Badges
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'challenges' && styles.tabActive]}
-          onPress={() => setActiveTab('challenges')}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === 'challenges' && styles.tabTextActive,
-            ]}
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === 'badges' && styles.tabTextActive,
+              ]}
+            >
+              Badges
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'challenges' && styles.tabActive]}
+            onPress={() => setActiveTab('challenges')}
           >
-            Challenges
-          </Text>
-        </TouchableOpacity>
-      </View>
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === 'challenges' && styles.tabTextActive,
+              ]}
+            >
+              Challenges
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {activeTab === 'badges' ? renderBadges() : renderChallenges()}
+        {!hasChallenges || activeTab === 'badges'
+          ? renderBadges()
+          : renderChallenges()}
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 };
 

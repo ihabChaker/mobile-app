@@ -70,7 +70,9 @@ class QuizService {
    * Obtenir tous les quizzes
    */
   async getAllQuizzes(): Promise<Quiz[]> {
-    const response = await apiService.get<Quiz[] | PaginatedResponse<Quiz>>('/quizzes');
+    const response = await apiService.get<Quiz[] | PaginatedResponse<Quiz>>(
+      '/quizzes'
+    );
     return extractData(response);
   }
 
@@ -85,28 +87,37 @@ class QuizService {
    * Obtenir les quizzes d'un parcours
    */
   async getQuizzesByParcours(parcoursId: number): Promise<Quiz[]> {
-    const response = await apiService.get<Quiz[]>(`/quizzes/parcours/${parcoursId}`);
+    const response = await apiService.get<Quiz[]>(
+      `/quizzes/parcours/${parcoursId}`
+    );
     return Array.isArray(response) ? response : [];
   }
 
   /**
    * Soumettre une tentative de quiz
    */
-  async submitQuizAttempt(dto: SubmitQuizAttemptDto): Promise<{
+  async submitQuizAttempt(
+    quizId: number,
+    answers: { questionId: number; answerId: number }[]
+  ): Promise<{
     attempt: QuizAttempt;
     score: number;
-    maxScore: number;
+    totalQuestions: number;
+    correctAnswers: number;
+    passed: boolean;
     pointsEarned: number;
-    results: { questionId: number; correct: boolean; points: number }[];
   }> {
-    return apiService.post('/quizzes/attempts', dto);
+    const dto: SubmitQuizAttemptDto = { quizId, answers };
+    return apiService.post('/quiz-attempts', dto);
   }
 
   /**
    * Obtenir l'historique des tentatives de quiz
    */
-  async getMyAttempts(): Promise<QuizAttempt[]> {
-    const response = await apiService.get<QuizAttempt[] | PaginatedResponse<QuizAttempt>>('/quizzes/attempts/me');
+  async getMyQuizAttempts(): Promise<QuizAttempt[]> {
+    const response = await apiService.get<
+      QuizAttempt[] | PaginatedResponse<QuizAttempt>
+    >('/quizzes/attempts/me');
     return extractData(response);
   }
 }

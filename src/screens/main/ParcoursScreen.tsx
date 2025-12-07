@@ -8,14 +8,16 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MainStackParamList } from '@/navigation/types';
 import { colors, typography, spacing } from '@/theme';
 import { ParcoursCard } from '@/components';
 import { Parcours } from '@/types/parcours.types';
 import parcoursService from '@/services/parcours.service';
+import parcoursSessionService from '@/services/parcours-session.service';
+import { ParcoursSession } from '@/types/backend.types';
 
 type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
@@ -24,8 +26,8 @@ type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
  */
 export const ParcoursScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
-  const insets = useSafeAreaInsets();
   const [parcours, setParcours] = useState<Parcours[]>([]);
+  const [activeSessions, setActiveSessions] = useState<ParcoursSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,10 +41,27 @@ export const ParcoursScreen: React.FC = () => {
       }
       setError(null);
 
-      const data = await parcoursService.getParcours();
-      setParcours(data);
+      const [parcoursData, sessionsData] = await Promise.all([
+        parcoursService.getParcours(),
+        parcoursSessionService.getActiveSessions().catch(() => []),
+      ]);
+
+      // If user has an active session, only show that parcours
+      if (sessionsData && sessionsData.length > 0) {
+        const activeParcoursIds = sessionsData.map(s => s.parcoursId);
+        const filteredParcours = parcoursData.filter(p =>
+          activeParcoursIds.includes(p.id)
+        );
+        setParcours(filteredParcours);
+      } else {
+        // No active session, show all parcours
+        setParcours(parcoursData);
+      }
+
+      setActiveSessions(sessionsData);
     } catch (err: any) {
-      const errorMessage = err.message || 'Erreur lors du chargement des parcours';
+      const errorMessage =
+        err.message || 'Erreur lors du chargement des parcours';
       setError(errorMessage);
       Alert.alert('Erreur', errorMessage);
     } finally {
@@ -60,7 +79,49 @@ export const ParcoursScreen: React.FC = () => {
   }, []);
 
   const handleParcoursPress = (parcours: Parcours) => {
-    navigation.navigate('ParcoursDetail', { parcoursId: parcours.id });
+    const activeSession = activeSessions.find(
+      s => s.parcoursId === parcours.id
+    );
+
+    if (activeSession) {
+      // Navigate to tracking screen for active parcours
+      navigation.navigate('ParcoursTracking', {
+        parcoursId: parcours.id,
+        sessionId: activeSession.id,
+      });
+    } else {
+      // Navigate to details for inactive parcours
+      navigation.navigate('ParcoursDetail', { parcoursId: parcours.id });
+    }
+  };
+
+  const handleAbandonSession = async (parcoursId: number) => {
+    const activeSession = activeSessions.find(s => s.parcoursId === parcoursId);
+    if (!activeSession) return;
+
+    Alert.alert(
+      'Abandonner le parcours',
+      'Êtes-vous sûr de vouloir abandonner ce parcours en cours ?',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Abandonner',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await parcoursSessionService.deleteSession(activeSession.id);
+              Alert.alert('Succès', 'Parcours abandonné');
+              fetchParcours(true);
+            } catch (error: any) {
+              Alert.alert(
+                'Erreur',
+                error.message || "Impossible d'abandonner le parcours"
+              );
+            }
+          },
+        },
+      ]
+    );
   };
 
   const renderEmptyList = () => {
@@ -94,16 +155,16 @@ export const ParcoursScreen: React.FC = () => {
 
   if (isLoading && !isRefreshing) {
     return (
-      <View style={[styles.loadingContainer, { paddingTop: insets.top }]}>
+      <SafeAreaView style={styles.loadingContainer} edges={['top']}>
         <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Chargement des parcours...</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + spacing.lg }]}>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.header}>
         <Text style={styles.title}>Parcours Disponibles</Text>
         <Text style={styles.subtitle}>
           Découvrez les sites historiques de la Normandie
@@ -113,14 +174,21 @@ export const ParcoursScreen: React.FC = () => {
       {renderError()}
 
       <FlatList
-        data={parcours || []}
+        data={parcours}
         keyExtractor={item => item.id.toString()}
-        renderItem={({ item }) => (
-          <ParcoursCard
-            parcours={item}
-            onPress={() => handleParcoursPress(item)}
-          />
-        )}
+        renderItem={({ item }) => {
+          const isActive = activeSessions.some(s => s.parcoursId === item.id);
+          return (
+            <ParcoursCard
+              parcours={item}
+              onPress={() => handleParcoursPress(item)}
+              isActive={isActive}
+              onAbandon={
+                isActive ? () => handleAbandonSession(item.id) : undefined
+              }
+            />
+          );
+        }}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={renderEmptyList}
         refreshControl={
@@ -133,7 +201,7 @@ export const ParcoursScreen: React.FC = () => {
         }
         showsVerticalScrollIndicator={false}
       />
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -157,6 +225,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: spacing.md,
+    paddingBottom: 100, // Space for floating tab bar
     flexGrow: 1,
   },
   loadingContainer: {

@@ -8,6 +8,7 @@ import {
   Alert,
   TouchableOpacity,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { MainStackParamList } from '@/navigation/types';
@@ -23,12 +24,17 @@ type QuizScreenProps = {
  * Écran de quiz interactif
  * Phase 4 - Gamification
  */
-export const QuizScreen: React.FC<QuizScreenProps> = ({ navigation, route }) => {
+export const QuizScreen: React.FC<QuizScreenProps> = ({
+  navigation,
+  route,
+}) => {
   const { quizId } = route.params;
-  
+
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [selectedAnswers, setSelectedAnswers] = useState<Map<number, number>>(new Map());
+  const [selectedAnswers, setSelectedAnswers] = useState<Map<number, number>>(
+    new Map()
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showResults, setShowResults] = useState(false);
@@ -59,11 +65,14 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({ navigation, route }) => 
   const questions = quiz?.questions || [];
   const currentQuestion = questions[currentQuestionIndex];
   const totalQuestions = questions.length;
-  const progress = totalQuestions > 0 ? ((currentQuestionIndex + 1) / totalQuestions) * 100 : 0;
+  const progress =
+    totalQuestions > 0
+      ? ((currentQuestionIndex + 1) / totalQuestions) * 100
+      : 0;
 
   const handleAnswerSelect = (answerId: number) => {
     if (showResults || !currentQuestion) return;
-    
+
     const newAnswers = new Map(selectedAnswers);
     newAnswers.set(currentQuestion.id, answerId);
     setSelectedAnswers(newAnswers);
@@ -85,7 +94,9 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({ navigation, route }) => 
     if (!quiz) return;
 
     // Check if all questions are answered
-    const unansweredCount = questions.filter(q => !selectedAnswers.has(q.id)).length;
+    const unansweredCount = questions.filter(
+      q => !selectedAnswers.has(q.id)
+    ).length;
     if (unansweredCount > 0) {
       Alert.alert(
         'Questions non répondues',
@@ -106,21 +117,20 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({ navigation, route }) => 
 
     try {
       setIsSubmitting(true);
-      const answers = Array.from(selectedAnswers.entries()).map(([questionId, answerId]) => ({
-        questionId,
-        answerId,
-      }));
+      const answers = Array.from(selectedAnswers.entries()).map(
+        ([questionId, answerId]) => ({
+          questionId,
+          answerId,
+        })
+      );
 
-      const result = await quizService.submitQuizAttempt({
-        quizId: quiz.id,
-        answers,
-      });
+      const result = await quizService.submitQuizAttempt(quiz.id, answers);
 
       setResults({
         score: result.score,
-        maxScore: result.maxScore,
+        maxScore: result.totalQuestions,
         pointsEarned: result.pointsEarned,
-        questionResults: result.results,
+        questionResults: [],
       });
       setShowResults(true);
     } catch (error: any) {
@@ -152,86 +162,120 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({ navigation, route }) => 
 
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
+      <SafeAreaView style={styles.loadingContainer} edges={['top', 'bottom']}>
         <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Chargement du quiz...</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (!quiz || questions.length === 0) {
     return (
-      <View style={styles.errorContainer}>
+      <SafeAreaView style={styles.errorContainer} edges={['top', 'bottom']}>
         <Text style={styles.errorIcon}>📝</Text>
         <Text style={styles.errorText}>Aucune question disponible</Text>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
           <Text style={styles.backButtonText}>Retour</Text>
         </TouchableOpacity>
-      </View>
+      </SafeAreaView>
     );
   }
 
   // Results screen
   if (showResults && results) {
-    const percentage = results.maxScore > 0 ? (results.score / results.maxScore) * 100 : 0;
-    
+    const percentage =
+      results.maxScore > 0 ? (results.score / results.maxScore) * 100 : 0;
+
     return (
-      <ScrollView style={styles.container} contentContainerStyle={styles.resultsContainer}>
-        <View style={styles.resultsCard}>
-          <Text style={styles.resultsEmoji}>{getScoreEmoji(percentage)}</Text>
-          <Text style={styles.resultsTitle}>Quiz terminé !</Text>
-          
-          <View style={styles.scoreContainer}>
-            <Text style={styles.scoreValue}>{results.score}</Text>
-            <Text style={styles.scoreMax}>/ {results.maxScore}</Text>
-          </View>
-          
-          <Text style={styles.percentageText}>{Math.round(percentage)}% de bonnes réponses</Text>
-          
-          <View style={styles.pointsEarnedContainer}>
-            <Text style={styles.pointsEarnedLabel}>Points gagnés</Text>
-            <Text style={styles.pointsEarnedValue}>+{results.pointsEarned} pts</Text>
-          </View>
-        </View>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <ScrollView contentContainerStyle={styles.resultsContainer}>
+          <View style={styles.resultsCard}>
+            <Text style={styles.resultsEmoji}>{getScoreEmoji(percentage)}</Text>
+            <Text style={styles.resultsTitle}>Quiz terminé !</Text>
 
-        {/* Question breakdown */}
-        <View style={styles.breakdownContainer}>
-          <Text style={styles.breakdownTitle}>Détail des réponses</Text>
-          {results.questionResults.map((qr, index) => {
-            const question = questions.find(q => q.id === qr.questionId);
-            return (
-              <View key={qr.questionId} style={styles.breakdownItem}>
-                <View style={[styles.breakdownIndicator, { backgroundColor: qr.correct ? colors.success : colors.error }]} />
-                <View style={styles.breakdownContent}>
-                  <Text style={styles.breakdownQuestion} numberOfLines={2}>
-                    Q{index + 1}: {question?.questionText || 'Question'}
-                  </Text>
-                  <Text style={[styles.breakdownResult, { color: qr.correct ? colors.success : colors.error }]}>
-                    {qr.correct ? `✓ Correct (+${qr.points} pts)` : '✗ Incorrect'}
-                  </Text>
+            <View style={styles.scoreContainer}>
+              <Text style={styles.scoreValue}>{results.score}</Text>
+              <Text style={styles.scoreMax}>/ {results.maxScore}</Text>
+            </View>
+
+            <Text style={styles.percentageText}>
+              {Math.round(percentage)}% de bonnes réponses
+            </Text>
+
+            <View style={styles.pointsEarnedContainer}>
+              <Text style={styles.pointsEarnedLabel}>Points gagnés</Text>
+              <Text style={styles.pointsEarnedValue}>
+                +{results.pointsEarned} pts
+              </Text>
+            </View>
+          </View>
+
+          {/* Question breakdown */}
+          <View style={styles.breakdownContainer}>
+            <Text style={styles.breakdownTitle}>Détail des réponses</Text>
+            {results.questionResults.map((qr, index) => {
+              const question = questions.find(q => q.id === qr.questionId);
+              return (
+                <View key={qr.questionId} style={styles.breakdownItem}>
+                  <View
+                    style={[
+                      styles.breakdownIndicator,
+                      {
+                        backgroundColor: qr.correct
+                          ? colors.success
+                          : colors.error,
+                      },
+                    ]}
+                  />
+                  <View style={styles.breakdownContent}>
+                    <Text style={styles.breakdownQuestion} numberOfLines={2}>
+                      Q{index + 1}: {question?.questionText || 'Question'}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.breakdownResult,
+                        { color: qr.correct ? colors.success : colors.error },
+                      ]}
+                    >
+                      {qr.correct
+                        ? `✓ Correct (+${qr.points} pts)`
+                        : '✗ Incorrect'}
+                    </Text>
+                  </View>
                 </View>
-              </View>
-            );
-          })}
-        </View>
+              );
+            })}
+          </View>
 
-        <TouchableOpacity style={styles.finishButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.finishButtonText}>Terminer</Text>
-        </TouchableOpacity>
-      </ScrollView>
+          <TouchableOpacity
+            style={styles.finishButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.finishButtonText}>Terminer</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
     );
   }
 
   // Quiz questions screen
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* Progress header */}
       <View style={styles.progressHeader}>
         <View style={styles.progressInfo}>
           <Text style={styles.progressText}>
             Question {currentQuestionIndex + 1} / {totalQuestions}
           </Text>
-          <View style={[styles.difficultyBadge, { backgroundColor: getDifficultyColor(quiz.difficulty) }]}>
+          <View
+            style={[
+              styles.difficultyBadge,
+              { backgroundColor: getDifficultyColor(quiz.difficulty) },
+            ]}
+          >
             <Text style={styles.difficultyText}>{quiz.difficulty}</Text>
           </View>
         </View>
@@ -240,35 +284,63 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({ navigation, route }) => 
         </View>
       </View>
 
-      <ScrollView style={styles.questionContainer} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.questionContainer}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Question */}
         <View style={styles.questionCard}>
-          <Text style={styles.questionNumber}>Question {currentQuestionIndex + 1}</Text>
-          <Text style={styles.questionText}>{currentQuestion?.questionText || ''}</Text>
+          <Text style={styles.questionNumber}>
+            Question {currentQuestionIndex + 1}
+          </Text>
+          <Text style={styles.questionText}>
+            {currentQuestion?.questionText || ''}
+          </Text>
           {currentQuestion?.points && (
-            <Text style={styles.questionPoints}>{currentQuestion.points} points</Text>
+            <Text style={styles.questionPoints}>
+              {currentQuestion.points} points
+            </Text>
           )}
         </View>
 
         {/* Answers */}
         <View style={styles.answersContainer}>
           {(currentQuestion?.answers || []).map((answer, index) => {
-            const isSelected = selectedAnswers.get(currentQuestion.id) === answer.id;
+            const isSelected =
+              selectedAnswers.get(currentQuestion.id) === answer.id;
             const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
-            
+
             return (
               <TouchableOpacity
                 key={answer.id}
-                style={[styles.answerButton, isSelected && styles.answerButtonSelected]}
+                style={[
+                  styles.answerButton,
+                  isSelected && styles.answerButtonSelected,
+                ]}
                 onPress={() => handleAnswerSelect(answer.id)}
                 activeOpacity={0.7}
               >
-                <View style={[styles.answerLetter, isSelected && styles.answerLetterSelected]}>
-                  <Text style={[styles.answerLetterText, isSelected && styles.answerLetterTextSelected]}>
+                <View
+                  style={[
+                    styles.answerLetter,
+                    isSelected && styles.answerLetterSelected,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.answerLetterText,
+                      isSelected && styles.answerLetterTextSelected,
+                    ]}
+                  >
                     {letters[index] || index + 1}
                   </Text>
                 </View>
-                <Text style={[styles.answerText, isSelected && styles.answerTextSelected]}>
+                <Text
+                  style={[
+                    styles.answerText,
+                    isSelected && styles.answerTextSelected,
+                  ]}
+                >
                   {answer.answerText}
                 </Text>
               </TouchableOpacity>
@@ -280,18 +352,29 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({ navigation, route }) => 
       {/* Navigation buttons */}
       <View style={styles.navigationContainer}>
         <TouchableOpacity
-          style={[styles.navButton, currentQuestionIndex === 0 && styles.navButtonDisabled]}
+          style={[
+            styles.navButton,
+            currentQuestionIndex === 0 && styles.navButtonDisabled,
+          ]}
           onPress={handlePrevious}
           disabled={currentQuestionIndex === 0}
         >
-          <Text style={[styles.navButtonText, currentQuestionIndex === 0 && styles.navButtonTextDisabled]}>
+          <Text
+            style={[
+              styles.navButtonText,
+              currentQuestionIndex === 0 && styles.navButtonTextDisabled,
+            ]}
+          >
             ← Précédent
           </Text>
         </TouchableOpacity>
 
         {currentQuestionIndex === totalQuestions - 1 ? (
           <TouchableOpacity
-            style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+            style={[
+              styles.submitButton,
+              isSubmitting && styles.submitButtonDisabled,
+            ]}
             onPress={handleSubmit}
             disabled={isSubmitting}
           >
@@ -313,7 +396,7 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({ navigation, route }) => 
         {questions.map((q, index) => {
           const isAnswered = selectedAnswers.has(q.id);
           const isCurrent = index === currentQuestionIndex;
-          
+
           return (
             <TouchableOpacity
               key={q.id}
@@ -327,7 +410,7 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({ navigation, route }) => 
           );
         })}
       </View>
-    </View>
+    </SafeAreaView>
   );
 };
 

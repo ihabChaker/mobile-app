@@ -8,10 +8,13 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 import { colors, typography, spacing } from '@/theme';
 import rewardService from '@/services/reward.service';
-import type { LeaderboardEntry } from '@/services/reward.service';
+import type { LeaderboardEntry } from '@/types/backend.types';
 
 type Period = 'week' | 'month' | 'year' | 'all';
 
@@ -43,13 +46,16 @@ export const LeaderboardScreen: React.FC = () => {
 
   const loadLeaderboard = async () => {
     try {
-      setState((prev) => ({ ...prev, loading: true }));
-      const data = await rewardService.getLeaderboard(state.selectedPeriod);
-      
-      // Find current user's rank if available
-      const myRank = data.findIndex((entry) => entry.isCurrentUser);
-      
-      setState((prev) => ({
+      setState(prev => ({ ...prev, loading: true }));
+      const data =
+        state.selectedPeriod === 'week'
+          ? await rewardService.getWeeklyLeaderboard()
+          : await rewardService.getGlobalLeaderboard();
+
+      // Find current user's rank if available (would need userId from auth)
+      const myRank = -1;
+
+      setState(prev => ({
         ...prev,
         entries: data,
         loading: false,
@@ -57,18 +63,18 @@ export const LeaderboardScreen: React.FC = () => {
       }));
     } catch (error) {
       console.error('Error loading leaderboard:', error);
-      setState((prev) => ({ ...prev, loading: false }));
+      setState(prev => ({ ...prev, loading: false }));
     }
   };
 
   const handleRefresh = async () => {
-    setState((prev) => ({ ...prev, refreshing: true }));
+    setState(prev => ({ ...prev, refreshing: true }));
     await loadLeaderboard();
-    setState((prev) => ({ ...prev, refreshing: false }));
+    setState(prev => ({ ...prev, refreshing: false }));
   };
 
   const handlePeriodChange = (period: Period) => {
-    setState((prev) => ({ ...prev, selectedPeriod: period }));
+    setState(prev => ({ ...prev, selectedPeriod: period }));
   };
 
   const getRankColor = (rank: number) => {
@@ -115,10 +121,10 @@ export const LeaderboardScreen: React.FC = () => {
   const renderHeader = () => (
     <View style={styles.header}>
       <Text style={styles.headerTitle}>🏆 Classement</Text>
-      
+
       {/* Period Filters */}
       <View style={styles.periodFilters}>
-        {(['week', 'month', 'year', 'all'] as Period[]).map((period) => (
+        {(['week', 'month', 'year', 'all'] as Period[]).map(period => (
           <TouchableOpacity
             key={period}
             style={[
@@ -130,7 +136,8 @@ export const LeaderboardScreen: React.FC = () => {
             <Text
               style={[
                 styles.periodButtonText,
-                state.selectedPeriod === period && styles.periodButtonTextActive,
+                state.selectedPeriod === period &&
+                  styles.periodButtonTextActive,
               ]}
             >
               {getPeriodLabel(period)}
@@ -155,15 +162,23 @@ export const LeaderboardScreen: React.FC = () => {
       {/* Column Headers */}
       <View style={styles.columnHeaders}>
         <Text style={[styles.columnHeader, styles.rankColumn]}>Rang</Text>
-        <Text style={[styles.columnHeader, styles.userColumn]}>Utilisateur</Text>
+        <Text style={[styles.columnHeader, styles.userColumn]}>
+          Utilisateur
+        </Text>
         <Text style={[styles.columnHeader, styles.pointsColumn]}>Points</Text>
       </View>
     </View>
   );
 
-  const renderItem = ({ item, index }: { item: LeaderboardEntry; index: number }) => {
+  const renderItem = ({
+    item,
+    index,
+  }: {
+    item: LeaderboardEntry;
+    index: number;
+  }) => {
     const rank = index + 1;
-    const isCurrentUser = item.isCurrentUser;
+    const isCurrentUser = false; // TODO: Compare item.userId with current user
     const isTopThree = rank <= 3;
 
     return (
@@ -198,15 +213,19 @@ export const LeaderboardScreen: React.FC = () => {
               {isCurrentUser && ' (Vous)'}
             </Text>
             <View style={styles.userStats}>
-              <Text style={styles.userLevel}>Niveau {item.level}</Text>
-              <Text style={styles.userBadges}>• {item.badgesCount} 🎖️</Text>
+              <Text style={styles.userLevel}>
+                {item.parcoursCompleted} parcours
+              </Text>
+              <Text style={styles.userBadges}>• {item.badgesEarned} 🎖️</Text>
             </View>
           </View>
         </View>
 
         {/* Points */}
         <View style={[styles.pointsCell, styles.pointsColumn]}>
-          <Text style={styles.pointsText}>{item.points.toLocaleString()}</Text>
+          <Text style={styles.pointsText}>
+            {item.totalPoints.toLocaleString()}
+          </Text>
           <Text style={styles.pointsLabel}>pts</Text>
         </View>
       </View>
@@ -233,17 +252,14 @@ export const LeaderboardScreen: React.FC = () => {
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <FlatList
         data={state.entries}
         renderItem={renderItem}
         keyExtractor={(item, index) => `${item.userId}-${index}`}
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={renderEmpty}
-        contentContainerStyle={[
-          state.entries.length === 0 && styles.emptyList,
-          { paddingTop: insets.top },
-        ]}
+        contentContainerStyle={state.entries.length === 0 && styles.emptyList}
         refreshControl={
           <RefreshControl
             refreshing={state.refreshing}
@@ -254,7 +270,7 @@ export const LeaderboardScreen: React.FC = () => {
         }
         showsVerticalScrollIndicator={false}
       />
-    </View>
+    </SafeAreaView>
   );
 };
 

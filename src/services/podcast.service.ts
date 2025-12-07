@@ -9,7 +9,9 @@ class PodcastService {
    * Lister tous les podcasts
    */
   async getAllPodcasts(): Promise<Podcast[]> {
-    const response = await apiService.get<Podcast[] | PaginatedResponse<Podcast>>('/podcasts');
+    const response = await apiService.get<
+      Podcast[] | PaginatedResponse<Podcast>
+    >('/media');
     return extractData(response);
   }
 
@@ -17,14 +19,16 @@ class PodcastService {
    * Obtenir un podcast par ID
    */
   async getPodcastById(id: number): Promise<Podcast> {
-    return apiService.get<Podcast>(`/podcasts/${id}`);
+    return apiService.get<Podcast>(`/media/${id}`);
   }
 
   /**
    * Obtenir les podcasts d'un parcours
    */
   async getPodcastsByParcours(parcoursId: number): Promise<Podcast[]> {
-    const response = await apiService.get<Podcast[] | PaginatedResponse<Podcast>>(`/podcasts/parcours/${parcoursId}`);
+    const response = await apiService.get<
+      Podcast[] | PaginatedResponse<Podcast>
+    >(`/media/parcours/${parcoursId}`);
     return extractData(response);
   }
 }

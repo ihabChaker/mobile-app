@@ -1,5 +1,11 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+} from 'react-native';
 import { colors, typography, spacing } from '@/theme';
 
 interface Props {
@@ -27,7 +33,7 @@ export class ErrorBoundary extends Component<Props, State> {
     };
   }
 
-  static getDerivedStateFromError(_error: Error): Partial<State> {
+  static getDerivedStateFromError(): Partial<State> {
     // Update state so the next render will show the fallback UI
     return { hasError: true };
   }
@@ -35,7 +41,7 @@ export class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     // Log error details
     console.error('ErrorBoundary caught an error:', error, errorInfo);
-    
+
     this.setState({
       error,
       errorInfo,
@@ -63,13 +69,16 @@ export class ErrorBoundary extends Component<Props, State> {
             <Text style={styles.icon}>⚠️</Text>
             <Text style={styles.title}>Oups ! Une erreur est survenue</Text>
             <Text style={styles.message}>
-              Nous sommes désolés pour ce désagrément. L'application a rencontré une erreur inattendue.
+              Nous sommes désolés pour ce désagrément. L'application a rencontré
+              une erreur inattendue.
             </Text>
 
             {__DEV__ && this.state.error && (
               <View style={styles.errorDetails}>
                 <Text style={styles.errorTitle}>Détails de l'erreur:</Text>
-                <Text style={styles.errorText}>{this.state.error.toString()}</Text>
+                <Text style={styles.errorText}>
+                  {this.state.error.toString()}
+                </Text>
                 {this.state.errorInfo && (
                   <Text style={styles.errorStack}>
                     {this.state.errorInfo.componentStack}
