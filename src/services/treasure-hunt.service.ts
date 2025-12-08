@@ -1,23 +1,19 @@
 import apiService, { extractData, PaginatedResponse } from './api.service';
 import { TreasureHunt, TreasureItem } from '@/types/backend.types';
 
-export interface RecordTreasureFoundDto {
-  treasureItemId: number;
-  latitude: number;
-  longitude: number;
-  qrCode?: string;
+export interface ScanTreasureItemDto {
+  qrCode: string;
 }
 
-export interface TreasureFoundResponse {
-  found: {
-    id: number;
-    userId: number;
-    treasureItemId: number;
-    foundDatetime: string;
-    pointsEarned: number;
-  };
-  message: string;
+export interface ScanTreasureItemResponseDto {
+  item: any;
+  treasureHunt: any;
   pointsEarned: number;
+  isNewFind: boolean;
+  totalItemsFound: number;
+  totalItemsInHunt: number;
+  huntComplete: boolean;
+  completionBonus?: number;
 }
 
 class TreasureHuntService {
@@ -56,19 +52,26 @@ class TreasureHuntService {
   async getTreasureItems(treasureHuntId: number): Promise<TreasureItem[]> {
     const response = await apiService.get<
       TreasureItem[] | PaginatedResponse<TreasureItem>
-    >(`/treasure-items/treasure-hunt/${treasureHuntId}`);
+    >(`/treasure-hunts/${treasureHuntId}/items`);
     return extractData(response);
   }
 
   /**
-   * Enregistrer une découverte de trésor
+   * Obtenir les IDs des items trouvés par l'utilisateur pour une chasse
    */
-  async recordFound(
-    data: RecordTreasureFoundDto
-  ): Promise<TreasureFoundResponse> {
-    return apiService.post<TreasureFoundResponse>(
-      '/treasure-items/found',
-      data
+  async getFoundItemsForHunt(treasureHuntId: number): Promise<number[]> {
+    return apiService.get<number[]>(
+      `/treasure-hunts/${treasureHuntId}/found-items`
+    );
+  }
+
+  /**
+   * Scanner un item de trésor par QR code
+   */
+  async scanTreasureItem(qrCode: string): Promise<ScanTreasureItemResponseDto> {
+    return apiService.post<ScanTreasureItemResponseDto>(
+      '/treasure-hunts/items/scan',
+      { qrCode }
     );
   }
 

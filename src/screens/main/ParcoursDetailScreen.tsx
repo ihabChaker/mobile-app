@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RouteProp } from '@react-navigation/native';
+import { RouteProp, useFocusEffect } from '@react-navigation/native';
 import { MainStackParamList } from '@/navigation/types';
 import { colors, typography, spacing } from '@/theme';
 import parcoursService from '@/services/parcours.service';
@@ -49,10 +49,32 @@ export const ParcoursDetailScreen: React.FC<ParcoursDetailScreenProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [isStarting, setIsStarting] = useState(false);
 
+  useFocusEffect(
+    React.useCallback(() => {
+      checkActiveSession();
+    }, [])
+  );
+
   useEffect(() => {
     loadParcours();
   }, [parcoursId]);
 
+  const checkActiveSession = async () => {
+    try {
+      const activeSessions = await parcoursSessionService.getActiveSessions();
+      const session = activeSessions.find(s => s.parcoursId === parcoursId);
+
+      // If there's an active session, navigate to tracking
+      if (session) {
+        navigation.replace('ParcoursTracking', {
+          parcoursId: parcoursId,
+          sessionId: session.id,
+        });
+      }
+    } catch (error) {
+      console.error('Error checking active session:', error);
+    }
+  };
   const loadParcours = async () => {
     try {
       setIsLoading(true);
@@ -380,9 +402,9 @@ export const ParcoursDetailScreen: React.FC<ParcoursDetailScreenProps> = ({
                           styles.quizDifficulty,
                           {
                             color:
-                              quiz.difficulty === 'facile'
+                              quiz.difficulty === 'easy'
                                 ? colors.success
-                                : quiz.difficulty === 'difficile'
+                                : quiz.difficulty === 'hard'
                                   ? colors.error
                                   : colors.warning,
                           },

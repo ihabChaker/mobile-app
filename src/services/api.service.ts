@@ -2,12 +2,16 @@ import axios, { AxiosInstance, AxiosError } from 'axios';
 import { store } from '@/store/store';
 import { logout } from '@/store/slices/authSlice';
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
 // URL de base de l'API backend - chargée depuis les variables d'environnement
+// For web, always use localhost
 const API_BASE_URL =
-  Constants.expoConfig?.extra?.apiUrl ||
-  process.env.EXPO_PUBLIC_API_URL ||
-  'http://localhost:3000/api/v1';
+  Platform.OS === 'web'
+    ? 'http://localhost:3000/api/v1'
+    : Constants.expoConfig?.extra?.apiUrl ||
+      process.env.EXPO_PUBLIC_API_URL ||
+      'http://localhost:3000/api/v1';
 
 console.log('========================================');
 console.log('🔗 API Configuration');

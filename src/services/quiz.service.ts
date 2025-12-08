@@ -7,10 +7,9 @@ export interface Quiz {
   id: number;
   title: string;
   description: string;
-  difficulty: 'facile' | 'moyen' | 'difficile';
+  difficulty: 'easy' | 'medium' | 'hard';
   isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+  creationDate: string;
   questions?: QuizQuestion[];
 }
 
@@ -23,9 +22,7 @@ export interface QuizQuestion {
   questionText: string;
   points: number;
   orderIndex: number;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+  creationDate: string;
   answers?: QuizAnswer[];
 }
 
@@ -38,6 +35,7 @@ export interface QuizAnswer {
   answerText: string;
   isCorrect: boolean;
   orderIndex: number;
+  creationDate: string;
 }
 
 /**
@@ -108,7 +106,7 @@ class QuizService {
     pointsEarned: number;
   }> {
     const dto: SubmitQuizAttemptDto = { quizId, answers };
-    return apiService.post('/quiz-attempts', dto);
+    return apiService.post('/quizzes/attempts', dto);
   }
 
   /**

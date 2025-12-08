@@ -8,83 +8,157 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, typography, spacing } from '@/theme';
 import rewardService from '@/services/reward.service';
-import { UserBadge, UserChallenge } from '@/types/backend.types';
+import { UserBadge, Reward, UserReward } from '@/types/backend.types';
+import { useSelector, useDispatch } from 'react-redux';
+import { RootState } from '@/store/store';
+import { setUser } from '@/store/slices/authSlice';
+import userService from '@/services/user.service';
+import { convertLocalhostUrl } from '@/utils/url.utils';
+
+type TabType = 'badges' | 'rewards' | 'redemptions';
 
 /**
- * Écran Récompenses - Phase 4
- * Affiche les badges et challenges de l'utilisateur
+ * Écran Récompenses
+ * Affiche les badges, récompenses disponibles et récompenses échangées
  */
 export const RewardsScreen: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<TabType>('badges');
   const [badges, setBadges] = useState<UserBadge[]>([]);
-  const [challenges, setChallenges] = useState<UserChallenge[]>([]);
-  const [availableChallenges, setAvailableChallenges] = useState<any[]>([]);
+  const [rewards, setRewards] = useState<Reward[]>([]);
+  const [redemptions, setRedemptions] = useState<UserReward[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'badges' | 'challenges'>('badges');
+  const [selectedReward, setSelectedReward] = useState<Reward | null>(null);
+  const [isRedeeming, setIsRedeeming] = useState(false);
+
+  const dispatch = useDispatch();
+  const user = useSelector((state: RootState) => state.auth.user);
+  const userPoints = user?.totalPoints || 0;
 
   useEffect(() => {
-    loadRewards();
-  }, []);
+    loadData();
+  }, [activeTab]);
 
-  const loadRewards = async () => {
+  const loadData = async () => {
     try {
       setIsLoading(true);
-      console.log('🏆 Loading rewards...');
 
-      const [badgesData, challengesData, availableData] = await Promise.all([
-        rewardService.getMyBadges().catch(err => {
-          console.error('❌ Error loading badges:', err);
-          throw err;
-        }),
-        rewardService.getMyChallenges().catch(err => {
-          console.error('❌ Error loading my challenges:', err);
-          throw err;
-        }),
-        rewardService.getActiveChallenges().catch(err => {
-          console.error('❌ Error loading active challenges:', err);
-          throw err;
-        }),
-      ]);
-
-      console.log('✅ Badges loaded:', badgesData.length);
-      console.log('✅ My challenges loaded:', challengesData.length);
-      console.log(
-        '✅ Available challenges loaded:',
-        availableData?.length || 0
-      );
-
-      setBadges(badgesData);
-      setChallenges(challengesData);
-      setAvailableChallenges(availableData || []);
+      if (activeTab === 'badges') {
+        console.log('🏆 Loading badges...');
+        const badgesData = await rewardService.getMyBadges();
+        console.log('✅ Badges loaded:', badgesData.length);
+        setBadges(badgesData);
+      } else if (activeTab === 'rewards') {
+        console.log('🎁 Loading available rewards...');
+        const rewardsData = await rewardService.getAvailableRewards();
+        console.log('✅ Rewards loaded:', rewardsData.length);
+        setRewards(rewardsData);
+      } else if (activeTab === 'redemptions') {
+        console.log('📋 Loading my redemptions...');
+        const redemptionsData = await rewardService.getMyRedemptions();
+        console.log('✅ Redemptions loaded:', redemptionsData.length);
+        setRedemptions(redemptionsData);
+      }
     } catch (error: any) {
-      console.error('❌ Rewards loading error:', error);
+      console.error('❌ Loading error:', error);
       Alert.alert(
         'Erreur',
-        `${error.message || 'Impossible de charger les récompenses'}\n\nDétails: ${JSON.stringify(error, null, 2)}`
+        error.message || 'Impossible de charger les données'
       );
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleStartChallenge = async (challengeId: number) => {
-    try {
-      await rewardService.acceptChallenge(challengeId);
-      Alert.alert('Succès', 'Challenge accepté avec succès !');
-      await loadRewards(); // Refresh the data
-    } catch (error: any) {
+  const handleRedeemReward = async (reward: Reward) => {
+    if (userPoints < reward.pointsCost) {
       Alert.alert(
-        'Erreur',
-        error.message || "Impossible d'accepter le challenge"
+        'Points insuffisants',
+        `Vous avez ${userPoints} points mais cette récompense coûte ${reward.pointsCost} points.`
       );
+      return;
     }
+
+    if (reward.stockQuantity <= 0) {
+      Alert.alert(
+        'Rupture de stock',
+        "Cette récompense n'est plus disponible."
+      );
+      return;
+    }
+
+    Alert.alert(
+      "Confirmer l'échange",
+      `Voulez-vous échanger ${reward.pointsCost} points contre "${reward.name}" ?`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Confirmer',
+          onPress: async () => {
+            try {
+              setIsRedeeming(true);
+              const redemption = await rewardService.redeemReward(reward.id);
+
+              // Refresh user data to update points
+              const updatedUser = await userService.getProfile();
+              dispatch(setUser(updatedUser));
+
+              Alert.alert(
+                '✅ Récompense obtenue !',
+                `Code de rédemption: ${redemption.redemptionCode}\n\nVous pouvez consulter vos récompenses dans l'onglet "Mes échanges".`,
+                [
+                  {
+                    text: 'OK',
+                    onPress: () => {
+                      setSelectedReward(null);
+                      setActiveTab('redemptions');
+                      loadData();
+                    },
+                  },
+                ]
+              );
+            } catch (error: any) {
+              // Handle insufficient points gracefully
+              const errorMessage = error.message || '';
+              if (
+                errorMessage.includes('Insufficient points') ||
+                errorMessage.includes('points')
+              ) {
+                Alert.alert(
+                  '💰 Points insuffisants',
+                  `Vous n'avez pas assez de points pour cette récompense. Il vous faut ${reward.pointsCost} points.`,
+                  [{ text: "D'accord" }]
+                );
+              } else if (errorMessage.includes('out of stock')) {
+                Alert.alert(
+                  '📦 Rupture de stock',
+                  "Cette récompense n'est plus disponible pour le moment.",
+                  [{ text: "D'accord" }]
+                );
+              } else {
+                Alert.alert(
+                  'Oups...',
+                  "Une erreur s'est produite. Veuillez réessayer plus tard.",
+                  [{ text: "D'accord" }]
+                );
+              }
+            } finally {
+              setIsRedeeming(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const getRarityColor = (rarity: string): string => {
-    switch (rarity) {
+    switch (rarity.toLowerCase()) {
+      case 'commune':
+        return colors.gray500;
       case 'commun':
         return colors.gray500;
       case 'rare':
@@ -95,6 +169,47 @@ export const RewardsScreen: React.FC = () => {
         return colors.warning;
       default:
         return colors.gray500;
+    }
+  };
+
+  const getRewardTypeIcon = (type: string): string => {
+    switch (type) {
+      case 'discount':
+        return '🎫';
+      case 'gift':
+        return '🎁';
+      case 'badge':
+        return '🏅';
+      case 'premium_content':
+        return '⭐';
+      default:
+        return '🎁';
+    }
+  };
+
+  const getStatusColor = (status: string): string => {
+    switch (status) {
+      case 'pending':
+        return colors.warning;
+      case 'redeemed':
+        return colors.success;
+      case 'used':
+        return colors.gray500;
+      default:
+        return colors.gray500;
+    }
+  };
+
+  const getStatusLabel = (status: string): string => {
+    switch (status) {
+      case 'pending':
+        return 'En attente';
+      case 'redeemed':
+        return 'Confirmé';
+      case 'used':
+        return 'Utilisé';
+      default:
+        return status;
     }
   };
 
@@ -115,253 +230,361 @@ export const RewardsScreen: React.FC = () => {
       <View style={styles.badgesGrid}>
         {badges
           .filter(userBadge => userBadge.badge)
-          .map(userBadge => (
-            <View key={userBadge.id} style={styles.badgeCard}>
-              <View
-                style={[
-                  styles.badgeIconContainer,
-                  { borderColor: getRarityColor(userBadge.badge!.rarity) },
-                ]}
-              >
-                {userBadge.badge!.iconUrl ? (
-                  <Image
-                    source={{ uri: userBadge.badge!.iconUrl }}
-                    style={styles.badgeIcon}
-                    resizeMode="contain"
-                  />
-                ) : (
-                  <Text style={styles.badgeIconPlaceholder}>🏅</Text>
-                )}
+          .map(userBadge => {
+            const badgeIconUrl = convertLocalhostUrl(userBadge.badge!.iconUrl);
+            return (
+              <View key={userBadge.id} style={styles.badgeCard}>
+                <View
+                  style={[
+                    styles.badgeIconContainer,
+                    { borderColor: getRarityColor(userBadge.badge!.rarity) },
+                  ]}
+                >
+                  {badgeIconUrl ? (
+                    <Image
+                      source={{ uri: badgeIconUrl }}
+                      style={styles.badgeIcon}
+                      resizeMode="contain"
+                      onError={e =>
+                        console.log(
+                          'Badge image load error:',
+                          e.nativeEvent.error
+                        )
+                      }
+                    />
+                  ) : (
+                    <Text style={styles.badgeIconPlaceholder}>🏅</Text>
+                  )}
+                </View>
+                <Text style={styles.badgeName} numberOfLines={2}>
+                  {userBadge.badge!.name}
+                </Text>
+                <Text style={styles.badgePoints}>
+                  +{userBadge.badge!.points} pts
+                </Text>
+                <Text
+                  style={[
+                    styles.badgeRarity,
+                    { color: getRarityColor(userBadge.badge!.rarity) },
+                  ]}
+                >
+                  {userBadge.badge!.rarity}
+                </Text>
               </View>
-              <Text style={styles.badgeName} numberOfLines={2}>
-                {userBadge.badge!.name}
-              </Text>
-              <Text style={styles.badgePoints}>
-                +{userBadge.badge!.points} pts
-              </Text>
-              <Text
-                style={[
-                  styles.badgeRarity,
-                  { color: getRarityColor(userBadge.badge!.rarity) },
-                ]}
-              >
-                {userBadge.badge!.rarity}
-              </Text>
-            </View>
-          ))}
+            );
+          })}
       </View>
     );
   };
 
-  const renderChallenges = () => {
-    // Get the IDs of already started challenges
-    const startedChallengeIds = challenges
-      .map(uc => uc.challenge?.id)
-      .filter(Boolean);
-
-    // Filter available challenges to exclude already started ones
-    const unStartedChallenges = (availableChallenges || []).filter(
-      challenge => !startedChallengeIds.includes(challenge.id)
-    );
-
-    if (challenges.length === 0 && unStartedChallenges.length === 0) {
+  const renderRewards = () => {
+    if (rewards.length === 0) {
       return (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>🎯</Text>
-          <Text style={styles.emptyTitle}>Aucun challenge disponible</Text>
+          <Text style={styles.emptyIcon}>🎁</Text>
+          <Text style={styles.emptyTitle}>Aucune récompense disponible</Text>
           <Text style={styles.emptyText}>
-            Les challenges arrivent bientôt !
+            Les récompenses seront bientôt disponibles !
           </Text>
         </View>
       );
     }
 
     return (
-      <View style={styles.challengesList}>
-        {/* Active/Started Challenges */}
-        {challenges.map(userChallenge => {
-          if (!userChallenge.challenge) return null;
-
-          const progress = userChallenge.progress || 0; // Progress is a percentage (0-100)
-          const isCompleted = userChallenge.status === 'completed';
+      <View style={styles.rewardsList}>
+        {rewards.map(reward => {
+          const canAfford = userPoints >= reward.pointsCost;
+          const inStock = reward.stockQuantity > 0;
+          const canRedeem = canAfford && inStock && reward.isAvailable;
 
           return (
-            <View key={userChallenge.id} style={styles.challengeCard}>
-              <View style={styles.challengeHeader}>
-                <View style={styles.challengeInfo}>
-                  <Text style={styles.challengeName}>
-                    {userChallenge.challenge.name}
-                  </Text>
-                  <Text style={styles.challengeDescription}>
-                    {userChallenge.challenge.description}
-                  </Text>
+            <TouchableOpacity
+              key={reward.id}
+              style={[
+                styles.rewardCard,
+                !canRedeem && styles.rewardCardDisabled,
+              ]}
+              onPress={() => setSelectedReward(reward)}
+              disabled={!canRedeem}
+            >
+              <View style={styles.rewardHeader}>
+                <Text style={styles.rewardTypeIcon}>
+                  {getRewardTypeIcon(reward.rewardType)}
+                </Text>
+                <View style={styles.rewardInfo}>
+                  <Text style={styles.rewardName}>{reward.name}</Text>
+                  {reward.partnerName && (
+                    <Text style={styles.rewardPartner}>
+                      Par {reward.partnerName}
+                    </Text>
+                  )}
                 </View>
-                {isCompleted && (
-                  <View style={styles.completedBadge}>
-                    <Text style={styles.completedIcon}>✓</Text>
-                  </View>
+                <View style={styles.rewardCost}>
+                  <Text
+                    style={[
+                      styles.rewardPoints,
+                      !canAfford && styles.rewardPointsInsufficient,
+                    ]}
+                  >
+                    {reward.pointsCost}
+                  </Text>
+                  <Text style={styles.rewardPointsLabel}>points</Text>
+                </View>
+              </View>
+
+              {reward.description && (
+                <Text style={styles.rewardDescription} numberOfLines={2}>
+                  {reward.description}
+                </Text>
+              )}
+
+              <View style={styles.rewardFooter}>
+                <Text style={styles.rewardStock}>
+                  {inStock
+                    ? `${reward.stockQuantity} disponible(s)`
+                    : 'Rupture de stock'}
+                </Text>
+                {!canAfford && (
+                  <Text style={styles.insufficientLabel}>
+                    Points insuffisants
+                  </Text>
                 )}
               </View>
-
-              <View style={styles.progressContainer}>
-                <View style={styles.progressBar}>
-                  <View
-                    style={[
-                      styles.progressFill,
-                      {
-                        width: `${Math.min(progress, 100)}%`,
-                        backgroundColor: isCompleted
-                          ? colors.success
-                          : colors.primary,
-                      },
-                    ]}
-                  />
-                </View>
-                <Text style={styles.progressText}>
-                  {Math.round(progress)}% complété
-                </Text>
-              </View>
-
-              <View style={styles.challengeFooter}>
-                <Text style={styles.challengeType}>
-                  {getChallengeTypeIcon(userChallenge.challenge.challengeType)}{' '}
-                  {getChallengeTypeLabel(userChallenge.challenge.challengeType)}
-                </Text>
-                <Text style={styles.challengeReward}>
-                  🎁 +{userChallenge.challenge.pointsReward} pts
-                </Text>
-              </View>
-            </View>
+            </TouchableOpacity>
           );
         })}
+      </View>
+    );
+  };
 
-        {/* Available Challenges (not started) */}
-        {unStartedChallenges.map(challenge => (
-          <View key={`available-${challenge.id}`} style={styles.challengeCard}>
-            <View style={styles.challengeHeader}>
-              <View style={styles.challengeInfo}>
-                <Text style={styles.challengeName}>{challenge.name}</Text>
-                <Text style={styles.challengeDescription}>
-                  {challenge.description}
+  const renderRedemptions = () => {
+    if (redemptions.length === 0) {
+      return (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyIcon}>📋</Text>
+          <Text style={styles.emptyTitle}>Aucun échange</Text>
+          <Text style={styles.emptyText}>
+            Échangez vos points contre des récompenses dans l'onglet
+            "Récompenses" !
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.redemptionsList}>
+        {redemptions.map(redemption => (
+          <View key={redemption.id} style={styles.redemptionCard}>
+            <View style={styles.redemptionHeader}>
+              <Text style={styles.redemptionName}>
+                {redemption.reward?.name || 'Récompense'}
+              </Text>
+              <View
+                style={[
+                  styles.statusBadge,
+                  { backgroundColor: getStatusColor(redemption.status) },
+                ]}
+              >
+                <Text style={styles.statusText}>
+                  {getStatusLabel(redemption.status)}
                 </Text>
               </View>
-              <View style={styles.newBadge}>
-                <Text style={styles.newBadgeText}>NOUVEAU</Text>
+            </View>
+
+            <View style={styles.redemptionCode}>
+              <Text style={styles.codeLabel}>Code de rédemption:</Text>
+              <Text style={styles.codeValue}>{redemption.redemptionCode}</Text>
+            </View>
+
+            <View style={styles.redemptionDetails}>
+              <View style={styles.redemptionDetail}>
+                <Text style={styles.detailLabel}>Points dépensés:</Text>
+                <Text style={styles.detailValue}>
+                  {redemption.pointsSpent} pts
+                </Text>
+              </View>
+              <View style={styles.redemptionDetail}>
+                <Text style={styles.detailLabel}>Date:</Text>
+                <Text style={styles.detailValue}>
+                  {new Date(redemption.redemptionDatetime).toLocaleDateString(
+                    'fr-FR'
+                  )}
+                </Text>
               </View>
             </View>
 
-            <View style={styles.challengeDetails}>
-              <Text style={styles.challengeTarget}>
-                🔥 Difficulté: x{challenge.difficultyMultiplier}
+            {redemption.status === 'pending' && (
+              <Text style={styles.redemptionNote}>
+                💡 Présentez ce code au partenaire pour obtenir votre récompense
               </Text>
-            </View>
-
-            <View style={styles.challengeFooter}>
-              <Text style={styles.challengeType}>
-                {getChallengeTypeIcon(challenge.challengeType)}{' '}
-                {getChallengeTypeLabel(challenge.challengeType)}
-              </Text>
-              <Text style={styles.challengeReward}>
-                🎁 +{challenge.pointsReward} pts
-              </Text>
-            </View>
-
-            <TouchableOpacity
-              style={styles.startButton}
-              onPress={() => handleStartChallenge(challenge.id)}
-            >
-              <Text style={styles.startButtonText}>Démarrer le challenge</Text>
-            </TouchableOpacity>
+            )}
           </View>
         ))}
       </View>
     );
   };
 
-  const getChallengeTypeIcon = (type: string): string => {
-    const icons: Record<string, string> = {
-      distance: '🚶',
-      time: '⏱️',
-      weighted_backpack: '🎒',
-      period_clothing: '👔',
-    };
-    return icons[type] || '🎯';
-  };
+  const renderRewardModal = () => {
+    if (!selectedReward) return null;
 
-  const getChallengeTypeLabel = (type: string): string => {
-    const labels: Record<string, string> = {
-      distance: 'Distance',
-      time: 'Temps',
-      weighted_backpack: 'Sac lesté',
-      period_clothing: "Vêtements d'époque",
-    };
-    return labels[type] || type;
+    const canAfford = userPoints >= selectedReward.pointsCost;
+    const inStock = selectedReward.stockQuantity > 0;
+    const canRedeem = canAfford && inStock;
+
+    return (
+      <Modal
+        visible={!!selectedReward}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setSelectedReward(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalIcon}>
+              {getRewardTypeIcon(selectedReward.rewardType)}
+            </Text>
+            <Text style={styles.modalTitle}>{selectedReward.name}</Text>
+
+            {selectedReward.partnerName && (
+              <Text style={styles.modalPartner}>
+                Par {selectedReward.partnerName}
+              </Text>
+            )}
+
+            {selectedReward.description && (
+              <Text style={styles.modalDescription}>
+                {selectedReward.description}
+              </Text>
+            )}
+
+            <View style={styles.modalStats}>
+              <View style={styles.modalStat}>
+                <Text style={styles.modalStatLabel}>Coût</Text>
+                <Text
+                  style={[
+                    styles.modalStatValue,
+                    !canAfford && styles.modalStatValueInsufficient,
+                  ]}
+                >
+                  {selectedReward.pointsCost} points
+                </Text>
+              </View>
+              <View style={styles.modalStat}>
+                <Text style={styles.modalStatLabel}>Stock</Text>
+                <Text style={styles.modalStatValue}>
+                  {selectedReward.stockQuantity}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.modalBalance}>
+              <Text style={styles.modalBalanceLabel}>Votre solde:</Text>
+              <Text style={styles.modalBalanceValue}>{userPoints} points</Text>
+            </View>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={() => setSelectedReward(null)}
+              >
+                <Text style={styles.modalCancelText}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalRedeemButton,
+                  !canRedeem && styles.modalRedeemButtonDisabled,
+                ]}
+                onPress={() => handleRedeemReward(selectedReward)}
+                disabled={!canRedeem || isRedeeming}
+              >
+                {isRedeeming ? (
+                  <ActivityIndicator color={colors.white} />
+                ) : (
+                  <Text style={styles.modalRedeemText}>
+                    {!canAfford
+                      ? 'Points insuffisants'
+                      : !inStock
+                        ? 'Rupture de stock'
+                        : 'Échanger'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
   };
 
   if (isLoading) {
     return (
       <SafeAreaView style={styles.loadingContainer} edges={['top', 'bottom']}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Chargement des récompenses...</Text>
+        <Text style={styles.loadingText}>Chargement...</Text>
       </SafeAreaView>
     );
   }
 
-  const hasChallenges =
-    challenges.length > 0 ||
-    (availableChallenges && availableChallenges.length > 0);
-
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>🏆 Mes Récompenses</Text>
-        <Text style={styles.headerSubtitle}>
-          {badges.length} badge{badges.length > 1 ? 's' : ''}
-          {hasChallenges &&
-            ` • ${challenges.length} challenge${challenges.length > 1 ? 's' : ''}`}
-        </Text>
+        <Text style={styles.headerTitle}>🏆 Récompenses</Text>
+        <Text style={styles.headerSubtitle}>Vous avez {userPoints} points</Text>
       </View>
 
-      {hasChallenges && (
-        <View style={styles.tabs}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'badges' && styles.tabActive]}
-            onPress={() => setActiveTab('badges')}
+      <View style={styles.tabs}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'badges' && styles.tabActive]}
+          onPress={() => setActiveTab('badges')}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'badges' && styles.tabTextActive,
+            ]}
           >
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === 'badges' && styles.tabTextActive,
-              ]}
-            >
-              Badges
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'challenges' && styles.tabActive]}
-            onPress={() => setActiveTab('challenges')}
+            Mes Badges
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'rewards' && styles.tabActive]}
+          onPress={() => setActiveTab('rewards')}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'rewards' && styles.tabTextActive,
+            ]}
           >
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === 'challenges' && styles.tabTextActive,
-              ]}
-            >
-              Challenges
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
+            Récompenses
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'redemptions' && styles.tabActive]}
+          onPress={() => setActiveTab('redemptions')}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'redemptions' && styles.tabTextActive,
+            ]}
+          >
+            Mes échanges
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {!hasChallenges || activeTab === 'badges'
-          ? renderBadges()
-          : renderChallenges()}
+        {activeTab === 'badges' && renderBadges()}
+        {activeTab === 'rewards' && renderRewards()}
+        {activeTab === 'redemptions' && renderRedemptions()}
       </ScrollView>
+
+      {renderRewardModal()}
     </SafeAreaView>
   );
 };
@@ -612,6 +835,270 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   startButtonText: {
+    ...typography.labelLarge,
+    color: colors.white,
+    fontWeight: '700',
+  },
+  // Rewards list styles
+  rewardsList: {
+    gap: spacing.md,
+  },
+  rewardCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: spacing.md,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  rewardCardDisabled: {
+    opacity: 0.6,
+  },
+  rewardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  rewardTypeIcon: {
+    fontSize: 32,
+    marginRight: spacing.sm,
+  },
+  rewardInfo: {
+    flex: 1,
+  },
+  rewardName: {
+    ...typography.h6,
+    color: colors.text,
+    marginBottom: spacing.xxs,
+  },
+  rewardPartner: {
+    ...typography.caption,
+    color: colors.gray600,
+  },
+  rewardCost: {
+    alignItems: 'flex-end',
+  },
+  rewardPoints: {
+    ...typography.h5,
+    color: colors.success,
+    fontWeight: '700',
+  },
+  rewardPointsInsufficient: {
+    color: colors.error,
+  },
+  rewardPointsLabel: {
+    ...typography.caption,
+    color: colors.gray600,
+  },
+  rewardDescription: {
+    ...typography.bodySmall,
+    color: colors.gray700,
+    marginBottom: spacing.sm,
+    lineHeight: 18,
+  },
+  rewardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  rewardStock: {
+    ...typography.caption,
+    color: colors.gray600,
+  },
+  insufficientLabel: {
+    ...typography.caption,
+    color: colors.error,
+    fontWeight: '600',
+  },
+  // Redemptions list styles
+  redemptionsList: {
+    gap: spacing.md,
+  },
+  redemptionCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: spacing.md,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  redemptionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  redemptionName: {
+    ...typography.h6,
+    color: colors.text,
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  statusBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
+    borderRadius: 6,
+  },
+  statusText: {
+    ...typography.caption,
+    color: colors.white,
+    fontWeight: '700',
+    fontSize: 10,
+  },
+  redemptionCode: {
+    backgroundColor: colors.gray100,
+    padding: spacing.sm,
+    borderRadius: 8,
+    marginBottom: spacing.md,
+  },
+  codeLabel: {
+    ...typography.caption,
+    color: colors.gray600,
+    marginBottom: spacing.xxs,
+  },
+  codeValue: {
+    ...typography.h5,
+    color: colors.text,
+    fontWeight: '700',
+    letterSpacing: 2,
+  },
+  redemptionDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  redemptionDetail: {
+    flex: 1,
+  },
+  detailLabel: {
+    ...typography.caption,
+    color: colors.gray600,
+    marginBottom: spacing.xxs,
+  },
+  detailValue: {
+    ...typography.bodyMedium,
+    color: colors.text,
+    fontWeight: '600',
+  },
+  redemptionNote: {
+    ...typography.caption,
+    color: colors.gray600,
+    fontStyle: 'italic',
+    lineHeight: 16,
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  modalContent: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: spacing.xl,
+    width: '100%',
+    maxWidth: 400,
+  },
+  modalIcon: {
+    fontSize: 64,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+  },
+  modalTitle: {
+    ...typography.h4,
+    color: colors.text,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  modalPartner: {
+    ...typography.bodyMedium,
+    color: colors.gray600,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+  },
+  modalDescription: {
+    ...typography.bodyMedium,
+    color: colors.gray700,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+    lineHeight: 20,
+  },
+  modalStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: spacing.lg,
+    paddingVertical: spacing.md,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: colors.gray300,
+  },
+  modalStat: {
+    alignItems: 'center',
+  },
+  modalStatLabel: {
+    ...typography.caption,
+    color: colors.gray600,
+    marginBottom: spacing.xxs,
+  },
+  modalStatValue: {
+    ...typography.h6,
+    color: colors.text,
+    fontWeight: '700',
+  },
+  modalStatValueInsufficient: {
+    color: colors.error,
+  },
+  modalBalance: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+    padding: spacing.md,
+    backgroundColor: colors.gray100,
+    borderRadius: 8,
+  },
+  modalBalanceLabel: {
+    ...typography.bodyMedium,
+    color: colors.gray700,
+  },
+  modalBalanceValue: {
+    ...typography.h6,
+    color: colors.primary,
+    fontWeight: '700',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  modalCancelButton: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.gray400,
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    ...typography.labelLarge,
+    color: colors.gray700,
+  },
+  modalRedeemButton: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    borderRadius: 8,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+  },
+  modalRedeemButtonDisabled: {
+    backgroundColor: colors.gray400,
+  },
+  modalRedeemText: {
     ...typography.labelLarge,
     color: colors.white,
     fontWeight: '700',

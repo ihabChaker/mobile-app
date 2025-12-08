@@ -123,7 +123,6 @@ export interface Quiz {
   title: string;
   description?: string;
   difficulty: 'easy' | 'medium' | 'hard';
-  pointsReward: number;
   createdAt: string;
   updatedAt: string;
   questions?: QuizQuestion[];
@@ -196,7 +195,6 @@ export interface TreasureHunt {
   latitude: number;
   longitude: number;
   scanRadiusMeters: number;
-  pointsReward: number;
   qrCode?: string;
   isActive: boolean;
   createdAt: string;
@@ -212,7 +210,7 @@ export interface TreasureItem {
   itemName: string; // Backend uses itemName, not name
   description?: string;
   imageUrl?: string;
-  pointsReward: number; // Backend uses pointsReward, not points
+  pointsValue: number; // Backend uses pointsValue
   qrCode: string;
   createdAt: string;
 }

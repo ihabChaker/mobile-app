@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MainStackParamList } from '@/navigation/types';
 import { colors, typography, spacing } from '@/theme';
@@ -70,9 +70,11 @@ export const ParcoursScreen: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    fetchParcours();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchParcours();
+    }, [])
+  );
 
   const onRefresh = useCallback(() => {
     fetchParcours(true);

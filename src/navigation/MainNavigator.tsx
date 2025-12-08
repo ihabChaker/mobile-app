@@ -11,8 +11,8 @@ import { ParcoursDetailScreen } from '@/screens/main/ParcoursDetailScreen';
 import { ParcoursTrackingScreen } from '@/screens/main/ParcoursTrackingScreen';
 import { ParcoursCompletionScreen } from '@/screens/main/ParcoursCompletionScreen';
 import { QuizScreen } from '@/screens/main/QuizScreen';
+import { TreasureHuntScreen } from '@/screens/main/TreasureHuntScreen';
 import { RewardsScreen } from '@/screens/main/RewardsScreen';
-import { LeaderboardScreen } from '@/screens/main/LeaderboardScreen';
 import { colors } from '@/theme';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -120,15 +120,6 @@ const MainTabs: React.FC = () => {
         }}
       />
       <Tab.Screen
-        name="LeaderboardTab"
-        component={LeaderboardScreen}
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon icon="🏆" label="Classement" focused={focused} />
-          ),
-        }}
-      />
-      <Tab.Screen
         name="Profil"
         component={ProfilScreen}
         options={{
@@ -187,6 +178,14 @@ export const MainNavigator: React.FC = () => {
         component={QuizScreen}
         options={{
           title: 'Quiz',
+          headerBackTitle: 'Retour',
+        }}
+      />
+      <Stack.Screen
+        name="TreasureHunt"
+        component={TreasureHuntScreen}
+        options={{
+          title: 'Chasse au trésor',
           headerBackTitle: 'Retour',
         }}
       />

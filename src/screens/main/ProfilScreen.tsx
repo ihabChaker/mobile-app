@@ -7,12 +7,8 @@ import {
   ScrollView,
   Alert,
   Modal,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
-import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { MainTabParamList } from '@/navigation/types';
 import { colors, typography, spacing } from '@/theme';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { logout, setUser } from '@/store/slices/authSlice';
@@ -20,23 +16,11 @@ import { QRScanner } from '@/components/QRScanner';
 import treasureHuntService from '@/services/treasure-hunt.service';
 import userService from '@/services/user.service';
 
-let Location: any = null;
-if (Platform.OS !== 'web') {
-  try {
-    Location = require('expo-location');
-  } catch {
-    // expo-location not available
-  }
-}
-
-type ProfilScreenNavigationProp = BottomTabNavigationProp<MainTabParamList>;
-
 /**
  * Écran Profil
  */
 export const ProfilScreen: React.FC = () => {
   const dispatch = useAppDispatch();
-  const navigation = useNavigation<ProfilScreenNavigationProp>();
   const user = useAppSelector(state => state.auth.user);
   const [showQRScanner, setShowQRScanner] = useState(false);
 
@@ -68,35 +52,17 @@ export const ProfilScreen: React.FC = () => {
         return;
       }
 
-      // Get Location
-      let latitude = 0;
-      let longitude = 0;
-
-      if (Platform.OS !== 'web' && Location) {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status === 'granted') {
-          const location = await Location.getCurrentPositionAsync({});
-          latitude = location.coords.latitude;
-          longitude = location.coords.longitude;
-        } else {
-          Alert.alert(
-            'Permission requise',
-            'La localisation est nécessaire pour valider le trésor.'
-          );
-          return;
-        }
-      }
-
       // Call API
-      const result = await treasureHuntService.recordFound({
-        treasureItemId,
-        qrCode: data,
-        latitude,
-        longitude,
-      }); // 3. Show Success
+      const result = await treasureHuntService.scanTreasureItem(data);
+
+      // Show Success
+      const successMessage = result.isNewFind
+        ? `Nouveau trésor trouvé ! (${result.totalItemsFound}/${result.totalItemsInHunt})`
+        : 'Vous avez déjà trouvé ce trésor';
+
       Alert.alert(
         'Trésor trouvé ! 🎉',
-        `${result.message}\n\n+${result.pointsEarned} points`,
+        `${successMessage}\n\n+${result.pointsEarned} points`,
         [{ text: 'Génial !' }]
       );
 
@@ -195,21 +161,6 @@ export const ProfilScreen: React.FC = () => {
         {/* Info Section */}
         <View style={styles.infoSection}>
           <View style={styles.infoRow}>
-            <Text style={styles.infoIcon}>📅</Text>
-            <Text style={styles.infoLabel}>Membre depuis</Text>
-            <Text style={styles.infoValue}>
-              {user.createdAt
-                ? new Date(user.createdAt).toLocaleDateString('fr-FR', {
-                    month: 'long',
-                    year: 'numeric',
-                  })
-                : 'N/A'}
-            </Text>
-          </View>
-
-          <View style={styles.divider} />
-
-          <View style={styles.infoRow}>
             <Text style={styles.infoIcon}>🗺️</Text>
             <Text style={styles.infoLabel}>Parcours complétés</Text>
             <Text style={styles.infoValue}>0</Text>
@@ -222,33 +173,6 @@ export const ProfilScreen: React.FC = () => {
             <Text style={styles.infoLabel}>POI découverts</Text>
             <Text style={styles.infoValue}>0</Text>
           </View>
-        </View>
-
-        {/* Action Buttons */}
-        <View style={styles.actionsContainer}>
-          <TouchableOpacity
-            style={styles.actionButton}
-            activeOpacity={0.7}
-            onPress={() => navigation.navigate('LeaderboardTab')}
-          >
-            <Text style={styles.actionButtonText}>🏆 Classement</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionButton}
-            activeOpacity={0.7}
-            onPress={() => navigation.navigate('RewardsTab')}
-          >
-            <Text style={styles.actionButtonText}>🎪 Mes récompenses</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.actionButton, styles.qrButton]}
-            activeOpacity={0.7}
-            onPress={() => setShowQRScanner(true)}
-          >
-            <Text style={styles.actionButtonText}>📱 Scanner QR Code</Text>
-          </TouchableOpacity>
         </View>
 
         {/* Logout Button */}

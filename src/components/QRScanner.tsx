@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -9,14 +9,14 @@ import {
 import { colors, typography, spacing } from '@/theme';
 
 // Conditional import for QR scanner (requires expo-camera)
-let BarCodeScanner: any = null;
-let Camera: any = null;
+let CameraView: any = null;
+let useCameraPermissions: any = null;
 
 if (Platform.OS !== 'web') {
   try {
     const ExpoCamera = require('expo-camera');
-    BarCodeScanner = ExpoCamera.BarCodeScanner;
-    Camera = ExpoCamera.Camera;
+    CameraView = ExpoCamera.CameraView;
+    useCameraPermissions = ExpoCamera.useCameraPermissions;
   } catch {
     console.warn('expo-camera not installed');
   }
@@ -32,19 +32,11 @@ interface QRScannerProps {
  * Phase 4 - Gamification
  */
 export const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [permission, requestPermission] =
+    Platform.OS !== 'web' && useCameraPermissions
+      ? useCameraPermissions()
+      : [null, null];
   const [scanned, setScanned] = useState(false);
-
-  useEffect(() => {
-    if (Platform.OS === 'web' || !Camera) {
-      return;
-    }
-
-    (async () => {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      setHasPermission(status === 'granted');
-    })();
-  }, []);
 
   const handleBarCodeScanned = ({ data }: { type: string; data: string }) => {
     setScanned(true);
@@ -68,7 +60,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
     );
   }
 
-  if (!Camera || !BarCodeScanner) {
+  if (!CameraView || !useCameraPermissions) {
     return (
       <View style={styles.container}>
         <View style={styles.content}>
@@ -85,7 +77,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
     );
   }
 
-  if (hasPermission === null) {
+  if (!permission) {
     return (
       <View style={styles.container}>
         <View style={styles.content}>
@@ -97,16 +89,28 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
     );
   }
 
-  if (hasPermission === false) {
+  if (!permission.granted) {
     return (
       <View style={styles.container}>
         <View style={styles.content}>
           <Text style={styles.errorIcon}>🚫</Text>
-          <Text style={styles.errorTitle}>Permission refusée</Text>
+          <Text style={styles.errorTitle}>Permission requise</Text>
           <Text style={styles.errorText}>
             L'accès à la caméra est nécessaire pour scanner les QR codes.
           </Text>
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={requestPermission}
+          >
+            <Text style={styles.closeButtonText}>Autoriser la caméra</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.closeButton,
+              { marginTop: 12, backgroundColor: colors.gray400 },
+            ]}
+            onPress={onClose}
+          >
             <Text style={styles.closeButtonText}>Fermer</Text>
           </TouchableOpacity>
         </View>
@@ -116,11 +120,12 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
 
   return (
     <View style={styles.container}>
-      <Camera
+      <CameraView
         style={styles.camera}
-        onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
-        barCodeScannerSettings={{
-          barCodeTypes: [BarCodeScanner.Constants.BarCodeType.qr],
+        facing="back"
+        onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+        barcodeScannerSettings={{
+          barcodeTypes: ['qr'],
         }}
       >
         <View style={styles.overlay}>
@@ -156,7 +161,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
             </View>
           </View>
         </View>
-      </Camera>
+      </CameraView>
     </View>
   );
 };

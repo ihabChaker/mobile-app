@@ -181,6 +181,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
+    height: 52,
     ...typography.bodyLarge,
     color: colors.text,
     borderWidth: 1,

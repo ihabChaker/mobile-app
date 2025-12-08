@@ -29,13 +29,12 @@ class POIService {
    */
   async recordVisit(
     poiId: number,
-    data: { latitude: number; longitude: number; activityId?: number }
+    data: { latitude: number; longitude: number }
   ): Promise<any> {
     return apiService.post(`/activities/poi-visits`, {
       poiId,
       latitude: data.latitude,
       longitude: data.longitude,
-      activityId: data.activityId,
       scannedQr: false,
       listenedAudio: false,
     });

@@ -66,11 +66,16 @@ class ParcoursSessionService {
   async completeSession(
     sessionId: number,
     dto: CompleteSessionDto
-  ): Promise<ParcoursSession> {
-    return await apiService.post<ParcoursSession>(
-      `/parcours-sessions/${sessionId}/complete`,
-      dto
-    );
+  ): Promise<{
+    session: ParcoursSession;
+    pointsEarned: number;
+    message: string;
+  }> {
+    return await apiService.post<{
+      session: ParcoursSession;
+      pointsEarned: number;
+      message: string;
+    }>(`/parcours-sessions/${sessionId}/complete`, dto);
   }
 
   /**

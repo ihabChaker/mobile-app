@@ -1,6 +1,7 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import type { RootState } from '../store';
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 import {
   LoginRequest,
   RegisterRequest,
@@ -9,10 +10,13 @@ import {
 } from '@/types/auth.types';
 
 // URL de base de l'API backend - chargée depuis les variables d'environnement
+// For web, always use localhost
 const API_BASE_URL =
-  Constants.expoConfig?.extra?.apiUrl ||
-  process.env.EXPO_PUBLIC_API_URL ||
-  'http://localhost:3000/api/v1';
+  Platform.OS === 'web'
+    ? 'http://localhost:3000/api/v1'
+    : Constants.expoConfig?.extra?.apiUrl ||
+      process.env.EXPO_PUBLIC_API_URL ||
+      'http://localhost:3000/api/v1';
 
 export const apiSlice = createApi({
   reducerPath: 'api',

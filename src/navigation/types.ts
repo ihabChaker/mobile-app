@@ -17,7 +17,6 @@ export type MainTabParamList = {
   Parcours: undefined;
   Carte: undefined;
   RewardsTab: undefined;
-  LeaderboardTab: undefined;
   Profil: undefined;
 };
 
@@ -36,6 +35,7 @@ export type MainStackParamList = {
     poisVisited: number;
   };
   Quiz: { quizId: number; quizTitle: string };
+  TreasureHunt: { treasureHuntId: number; treasureHuntName: string };
 };
 
 /**

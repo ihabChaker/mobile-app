@@ -12,7 +12,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
-import MapView, { Polyline, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { MainStackParamList } from '@/navigation/types';
 import { colors, spacing } from '@/theme';
 import parcoursSessionService from '@/services/parcours-session.service';
@@ -20,11 +19,33 @@ import parcoursService from '@/services/parcours.service';
 import poiService from '@/services/poi.service';
 import quizService from '@/services/quiz.service';
 import treasureHuntService from '@/services/treasure-hunt.service';
+import podcastService from '@/services/podcast.service';
 import { QRScanner } from '@/components/QRScanner';
-import { Parcours, POI } from '@/types/parcours.types';
+import { AudioPlayer } from '@/components/AudioPlayer';
+import { Parcours, POI, Podcast } from '@/types/parcours.types';
 import { ParcoursSession } from '@/types/backend.types';
 
-let Location: any = null;
+// Conditionally import MapView only on native platforms
+let MapView: any = null;
+let Polyline: any = null;
+let Marker: any = null;
+let PROVIDER_GOOGLE: any = null;
+
+if (Platform.OS !== 'web') {
+  try {
+    const MapModule = require('react-native-maps');
+    MapView = MapModule.default;
+    Polyline = MapModule.Polyline;
+    Marker = MapModule.Marker;
+    PROVIDER_GOOGLE = MapModule.PROVIDER_GOOGLE;
+  } catch {
+    // Map module not available
+  }
+}
+
+type LocationSubscription = { remove: () => void } | null;
+
+let Location: typeof import('expo-location') | null = null;
 if (Platform.OS !== 'web') {
   try {
     Location = require('expo-location');
@@ -52,8 +73,7 @@ export const ParcoursTrackingScreen: React.FC<ParcoursTrackingScreenProps> = ({
   // Proximity thresholds in meters
   const START_PROXIMITY_THRESHOLD = 50; // 50m to start (generous for GPS accuracy)
   const POI_PROXIMITY_THRESHOLD = 25; // 25m for POI discovery
-  const DESTINATION_PROXIMITY_THRESHOLD = 30; // 30m for completion
-
+  const DESTINATION_PROXIMITY_THRESHOLD = 10; // 10m for completion
   const [parcours, setParcours] = useState<Parcours | null>(null);
   const [session, setSession] = useState<ParcoursSession | null>(null);
   const [pois, setPois] = useState<POI[]>([]);
@@ -64,14 +84,23 @@ export const ParcoursTrackingScreen: React.FC<ParcoursTrackingScreenProps> = ({
   const [originalPath, setOriginalPath] = useState<LocationCoords[]>([]);
   const [traveledPath, setTraveledPath] = useState<LocationCoords[]>([]);
   const [showQRScanner, setShowQRScanner] = useState(false);
+  const [showPodcastPlayer, setShowPodcastPlayer] = useState(false);
+  const [selectedPodcast, setSelectedPodcast] = useState<Podcast | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [distance, setDistance] = useState(0);
   const [duration, setDuration] = useState(0);
   const [hasStarted, setHasStarted] = useState(false);
   const [visitedPOIs, setVisitedPOIs] = useState<Set<number>>(new Set());
-  const mapRef = useRef<MapView>(null);
-  const locationSubscription = useRef<any>(null);
+  const [reachedStart, setReachedStart] = useState(false);
+  const [reachedEnd, setReachedEnd] = useState(false);
+  const mapRef = useRef<any>(null);
+  const locationSubscription = useRef<LocationSubscription>(null);
   const startTime = useRef<Date>(new Date());
+  const hasStartedRef = useRef<boolean>(false); // Use ref to avoid closure issues
+  const originalPathRef = useRef<LocationCoords[]>([]); // Store original path in ref
+  const parcoursRef = useRef<Parcours | null>(null); // Store parcours in ref for callbacks
+  const sessionRef = useRef<ParcoursSession | null>(null); // Store session in ref
+  const currentLocationRef = useRef<LocationCoords | null>(null); // Store current location in ref
 
   useEffect(() => {
     loadParcoursData();
@@ -93,14 +122,10 @@ export const ParcoursTrackingScreen: React.FC<ParcoursTrackingScreenProps> = ({
         poiService.getPOIsByParcours(parcoursId),
       ]);
 
-      console.log('🗺️ Parcours Data:', JSON.stringify(parcoursData, null, 2));
-      console.log('📍 Starting Point:', {
-        lat: parcoursData.startingPointLat,
-        lon: parcoursData.startingPointLon,
-      });
-      console.log('📍 GeoJSON Path:', parcoursData.geoJsonPath);
+      console.log('🗺️ Parcours loaded:', parcoursData.name);
 
       setParcours(parcoursData);
+      parcoursRef.current = parcoursData; // Store in ref for callbacks
       setPois(poisData);
 
       // Get session if sessionId is provided
@@ -109,6 +134,7 @@ export const ParcoursTrackingScreen: React.FC<ParcoursTrackingScreenProps> = ({
         const currentSession = sessions.find(s => s.id === sessionId);
         if (currentSession) {
           setSession(currentSession);
+          sessionRef.current = currentSession; // Store in ref
         }
       }
 
@@ -116,23 +142,27 @@ export const ParcoursTrackingScreen: React.FC<ParcoursTrackingScreenProps> = ({
       if (parcoursData.geoJsonPath) {
         try {
           const geoData = JSON.parse(parcoursData.geoJsonPath);
-          console.log('📊 Parsed GeoJSON:', geoData);
+          // GeoJSON parsed
           if (geoData.type === 'LineString' && geoData.coordinates) {
             const coords = geoData.coordinates.map((coord: number[]) => ({
               longitude: coord[0],
               latitude: coord[1],
             }));
-            console.log('✅ Path Coordinates:', coords.length, 'points');
-            console.log('🎯 First:', coords[0]);
-            console.log('🏁 Last:', coords[coords.length - 1]);
+
+            console.log('📍 GeoJSON path loaded:', coords.length, 'points');
+            console.log('🎯 Start point:', coords[0]);
+            console.log('🏁 End point:', coords[coords.length - 1]);
+
+            // Path coordinates extracted
             setPathCoordinates(coords);
-            setOriginalPath(coords); // Store original path
+            setOriginalPath(coords); // Store original path in state
+            originalPathRef.current = coords; // Also store in ref for callbacks
           }
         } catch (e) {
           console.error('❌ Error parsing GeoJSON:', e);
         }
       } else {
-        console.log('⚠️ No GeoJSON path available for this parcours');
+        // No GeoJSON path available
       }
     } catch (error: any) {
       Alert.alert(
@@ -191,51 +221,41 @@ export const ParcoursTrackingScreen: React.FC<ParcoursTrackingScreenProps> = ({
       locationSubscription.current = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.High,
-          timeInterval: 5000, // Update every 5 seconds
-          distanceInterval: 10, // Or every 10 meters
+          timeInterval: 1000, // Update every 1 second for better tracking
+          distanceInterval: 3, // Or every 3 meters for better accuracy
         },
-        (location: any) => {
+        (location: { coords: { latitude: number; longitude: number } }) => {
           const newCoords = {
             latitude: location.coords.latitude,
             longitude: location.coords.longitude,
           };
 
           setCurrentLocation(newCoords);
+          currentLocationRef.current = newCoords; // Update ref
 
-          // Check if user is near start point (if not started yet)
-          if (!hasStarted && parcours) {
-            const distToStart = calculateDistance(newCoords, {
-              latitude: parcours.startingPointLat,
-              longitude: parcours.startingPointLon,
+          console.log(
+            '📍 Location update:',
+            newCoords.latitude.toFixed(6),
+            newCoords.longitude.toFixed(6),
+            '| Started:',
+            hasStartedRef.current
+          );
+
+          // Only track if started (use ref to avoid closure issue)
+          if (hasStartedRef.current) {
+            // Update traveled path and calculate distance in same update
+            setTraveledPath(prev => {
+              // Calculate distance from last point
+              if (prev.length > 0) {
+                const lastPoint = prev[prev.length - 1];
+                const dist = calculateDistance(lastPoint, newCoords);
+                setDistance(prevDist => prevDist + dist);
+              }
+              return [...prev, newCoords];
             });
-
-            if (distToStart > START_PROXIMITY_THRESHOLD) {
-              // User is too far from start
-              return;
-            } else {
-              // User is close enough, start tracking
-              setHasStarted(true);
-              setTraveledPath([newCoords]);
-              Alert.alert(
-                'Parcours démarré !',
-                'Vous êtes à proximité du point de départ. Bon parcours !'
-              );
-            }
-          }
-
-          // Only track if started
-          if (hasStarted) {
-            setTraveledPath(prev => [...prev, newCoords]);
 
             // Update remaining path to show visual progress
             updateRemainingPath(newCoords);
-
-            // Calculate distance
-            if (traveledPath.length > 0) {
-              const lastPoint = traveledPath[traveledPath.length - 1];
-              const dist = calculateDistance(lastPoint, newCoords);
-              setDistance(prev => prev + dist);
-            }
 
             // Check POI proximity
             checkPOIProximity(newCoords);
@@ -262,6 +282,39 @@ export const ParcoursTrackingScreen: React.FC<ParcoursTrackingScreenProps> = ({
       console.error('Location tracking error:', error);
       Alert.alert('Erreur', 'Impossible de démarrer le suivi GPS');
     }
+  };
+
+  const handleManualStart = () => {
+    const parcours = parcoursRef.current;
+    if (!currentLocation || !parcours) return;
+
+    const distToStart = calculateDistance(currentLocation, {
+      latitude: parcours.startingPointLat,
+      longitude: parcours.startingPointLon,
+    });
+
+    if (distToStart > START_PROXIMITY_THRESHOLD) {
+      Alert.alert(
+        'Trop loin du départ',
+        `Vous devez être à moins de ${START_PROXIMITY_THRESHOLD}m du point de départ pour commencer. Vous êtes actuellement à ${distToStart.toFixed(0)}m.`
+      );
+      return;
+    }
+
+    setHasStarted(true);
+    hasStartedRef.current = true; // Also update ref for closure
+    setReachedStart(true);
+    setTraveledPath([currentLocation]);
+    startTime.current = new Date();
+
+    console.log('🎯 PARCOURS STARTED!');
+    console.log('📍 Start location:', currentLocation);
+    console.log('📏 Path has', originalPathRef.current.length, 'points');
+
+    Alert.alert(
+      '🎯 Parcours démarré !',
+      "Bon parcours ! Suivez le tracé jusqu'à l'arrivée."
+    );
   };
 
   const updateSessionLocation = async (coords: LocationCoords) => {
@@ -304,7 +357,11 @@ export const ParcoursTrackingScreen: React.FC<ParcoursTrackingScreenProps> = ({
   };
 
   const updateRemainingPath = (currentPos: LocationCoords) => {
-    if (originalPath.length === 0) return;
+    const originalPath = originalPathRef.current;
+    if (originalPath.length === 0) {
+      console.log('⚠️ Cannot update path: originalPath is empty');
+      return;
+    }
 
     // Find the closest point on the original path
     let minDistance = Infinity;
@@ -318,25 +375,87 @@ export const ParcoursTrackingScreen: React.FC<ParcoursTrackingScreenProps> = ({
       }
     });
 
+    // Calculate percentage progress
+    const progressPercent = (
+      (closestIndex / originalPath.length) *
+      100
+    ).toFixed(1);
+
+    console.log(
+      '🗺️ PATH UPDATE:',
+      'Point',
+      closestIndex + 1,
+      '/',
+      originalPath.length,
+      `(${progressPercent}% complete)`,
+      '| Dist to path:',
+      minDistance.toFixed(1) + 'm'
+    );
+
     // Update remaining path (from closest point to end)
-    const remainingPath = originalPath.slice(closestIndex);
-    setPathCoordinates(remainingPath);
+    // Keep at least one point before the closest for smooth rendering
+    const startIndex = Math.max(0, closestIndex - 1);
+    const remainingPath = originalPath.slice(startIndex);
+
+    console.log(
+      '📍 Remaining:',
+      remainingPath.length,
+      'points | Completed:',
+      closestIndex,
+      'points'
+    );
+
+    // Force update by creating new array
+    setPathCoordinates([...remainingPath]);
   };
 
   const checkDestinationReached = (coords: LocationCoords) => {
-    if (pathCoordinates.length === 0 || !parcours) return;
+    const originalPath = originalPathRef.current;
+    const parcours = parcoursRef.current;
 
-    const destination = pathCoordinates[pathCoordinates.length - 1];
+    // Use ref to avoid closure issues
+    if (reachedEnd || !hasStartedRef.current) return;
+
+    if (originalPath.length === 0 || !parcours) {
+      console.log('⚠️ Cannot check destination: missing path or parcours data');
+      return;
+    }
+
+    // Use original path's last point (not the remaining path)
+    const destination = originalPath[originalPath.length - 1];
     const distToDestination = calculateDistance(coords, destination);
 
+    // Log every check for debugging
+    console.log(
+      '🏁 DESTINATION:',
+      distToDestination.toFixed(1) + 'm',
+      '| Threshold:',
+      DESTINATION_PROXIMITY_THRESHOLD + 'm',
+      '|',
+      distToDestination <= DESTINATION_PROXIMITY_THRESHOLD
+        ? '✅ IN RANGE!'
+        : '❌ Too far'
+    );
+
     // If within threshold of destination
-    if (distToDestination < DESTINATION_PROXIMITY_THRESHOLD) {
+    if (distToDestination <= DESTINATION_PROXIMITY_THRESHOLD) {
+      console.log('🎉🎉🎉 DESTINATION REACHED! Completing parcours...');
+      console.log(
+        '📍 Final position:',
+        coords.latitude.toFixed(6),
+        coords.longitude.toFixed(6)
+      );
+      console.log(
+        '🎯 Destination was:',
+        destination.latitude.toFixed(6),
+        destination.longitude.toFixed(6)
+      );
       handleParcoursComplete();
     }
   };
 
   const checkPOIProximity = (coords: LocationCoords) => {
-    if (!pois.length) return;
+    if (!pois.length || !hasStartedRef.current) return;
 
     pois.forEach(poi => {
       // Skip if already visited
@@ -355,7 +474,8 @@ export const ParcoursTrackingScreen: React.FC<ParcoursTrackingScreenProps> = ({
       });
 
       // If within POI proximity threshold
-      if (distToPOI < POI_PROXIMITY_THRESHOLD) {
+      if (distToPOI <= POI_PROXIMITY_THRESHOLD) {
+        // POI reached
         handlePOIVisit(poi);
       }
     });
@@ -371,7 +491,6 @@ export const ParcoursTrackingScreen: React.FC<ParcoursTrackingScreenProps> = ({
         await poiService.recordVisit(poi.id, {
           latitude: currentLocation.latitude,
           longitude: currentLocation.longitude,
-          activityId: session.id,
         });
       }
 
@@ -393,24 +512,74 @@ export const ParcoursTrackingScreen: React.FC<ParcoursTrackingScreenProps> = ({
   };
 
   const handleParcoursComplete = async () => {
-    if (!session || !currentLocation || !parcours) return;
+    const session = sessionRef.current;
+    const currentLocation = currentLocationRef.current;
+    const parcours = parcoursRef.current;
+
+    console.log(
+      '🔍 handleParcoursComplete called - session:',
+      !!session,
+      'location:',
+      !!currentLocation,
+      'parcours:',
+      !!parcours,
+      'reachedEnd:',
+      reachedEnd
+    );
+
+    if (!session || !currentLocation || !parcours) {
+      console.log(
+        '❌ Cannot complete: missing data - session:',
+        !!session,
+        'location:',
+        !!currentLocation,
+        'parcours:',
+        !!parcours
+      );
+      return;
+    }
+
+    // Prevent multiple completions
+    if (reachedEnd) {
+      console.log('❌ Already processing completion, returning');
+      return;
+    }
+
+    // Set flag immediately to prevent re-entry
+    setReachedEnd(true);
+    console.log('✅ Starting parcours completion...');
 
     try {
+      // Completing parcours session
+
+      // Stop location tracking to prevent further updates
+      if (locationSubscription.current) {
+        locationSubscription.current.remove();
+        locationSubscription.current = null;
+      }
+
       const result = await parcoursSessionService.completeSession(session.id, {
         finalLat: currentLocation.latitude,
         finalLon: currentLocation.longitude,
         distanceCovered: distance,
       });
 
+      console.log('🎊 Parcours completed!');
+      console.log('📊 Distance:', (distance / 1000).toFixed(2), 'km');
+      console.log('⏱️ Duration:', duration, 'seconds');
+      console.log('💰 Points earned:', result.pointsEarned);
+
       // Navigate to completion screen
       navigation.replace('ParcoursCompletion', {
         parcoursName: parcours.name,
         distance: distance / 1000,
         duration: duration,
-        pointsEarned: result.completionBonus || 0,
+        pointsEarned: result.pointsEarned,
         poisVisited: visitedPOIs.size,
       });
     } catch (error: any) {
+      console.error('❌ Error completing parcours:', error);
+      setReachedEnd(false); // Reset flag to allow retry
       Alert.alert(
         'Erreur',
         error.message || 'Impossible de terminer le parcours'
@@ -426,50 +595,114 @@ export const ParcoursTrackingScreen: React.FC<ParcoursTrackingScreenProps> = ({
       const poi = pois.find(p => p.qrCode === data);
 
       if (poi) {
-        // Register POI visit
-        await poiService.recordVisit(poi.id, {
-          latitude: currentLocation?.latitude || 0,
-          longitude: currentLocation?.longitude || 0,
-        });
+        // Check if already visited locally first
+        if (visitedPOIs.has(poi.id)) {
+          Alert.alert(
+            'POI déjà visité',
+            "Vous avez déjà scanné ce point d'intérêt. Veuillez continuer votre parcours.",
+            [{ text: 'OK' }]
+          );
+          return; // Stop here, don't show the content again
+        }
+
+        // Register POI visit (non-blocking)
+        try {
+          await poiService.recordVisit(poi.id, {
+            latitude: currentLocation?.latitude || 0,
+            longitude: currentLocation?.longitude || 0,
+          });
+
+          // Mark POI as visited
+          setVisitedPOIs(prev => new Set([...prev, poi.id]));
+        } catch (error: any) {
+          console.error('Failed to record POI visit:', error);
+
+          // Check if it's already visited error from backend
+          if (error.response?.data?.message?.includes('already visited')) {
+            // Add to local set even if backend says already visited
+            setVisitedPOIs(prev => new Set([...prev, poi.id]));
+            Alert.alert(
+              'POI déjà visité',
+              "Vous avez déjà scanné ce point d'intérêt. Veuillez continuer votre parcours.",
+              [{ text: 'OK' }]
+            );
+            return; // Stop here, don't show the content again
+          }
+          // For other errors, continue anyway - visit recording is not critical
+        }
 
         // Check what content the POI has
         if (poi.quizId) {
           // Navigate to quiz
-          const quiz = await quizService.getQuizById(poi.quizId);
-          navigation.navigate('Quiz', {
-            quizId: poi.quizId,
-            quizTitle: quiz.title || 'Quiz',
-          });
+          try {
+            const quiz = await quizService.getQuizById(poi.quizId);
+            navigation.navigate('Quiz', {
+              quizId: poi.quizId,
+              quizTitle: quiz.title || 'Quiz',
+            });
+          } catch (error: any) {
+            Alert.alert(
+              'Erreur',
+              error.message || 'Impossible de charger le quiz',
+              [{ text: 'OK' }]
+            );
+          }
         } else if (poi.treasureHuntId) {
-          // Handle treasure hunt
-          Alert.alert('Trésor trouvé ! 🏺', 'Vous avez découvert un trésor !');
-          // TODO: Show treasure details or navigate to treasure screen
+          // Navigate to treasure hunt screen
+          try {
+            const treasureHunt = await treasureHuntService.getTreasureHuntById(
+              poi.treasureHuntId
+            );
+            navigation.navigate('TreasureHunt', {
+              treasureHuntId: poi.treasureHuntId,
+              treasureHuntName: treasureHunt.name,
+            });
+          } catch (error: any) {
+            Alert.alert(
+              'Erreur',
+              error.message || 'Impossible de charger la chasse au trésor',
+              [{ text: 'OK' }]
+            );
+          }
         } else if (poi.podcastId) {
-          // Auto-play podcast
-          Alert.alert(
-            'Podcast disponible 🎧',
-            'Le podcast va démarrer automatiquement'
-          );
-          // TODO: Navigate to podcast player or auto-play
+          // Load and play podcast
+          try {
+            const podcast = await podcastService.getPodcastById(poi.podcastId);
+            setSelectedPodcast(podcast);
+            setShowPodcastPlayer(true);
+          } catch (error: any) {
+            Alert.alert(
+              'Erreur',
+              error.message || 'Impossible de charger le podcast',
+              [{ text: 'OK' }]
+            );
+          }
         } else {
           Alert.alert('POI découvert !', poi.name || "Point d'intérêt");
         }
       } else {
-        // Check if it's a treasure item QR code
-        const treasureItemMatch = data.match(/TREASURE_ITEM_ID:(\d+)/);
-        if (treasureItemMatch) {
-          const treasureItemId = parseInt(treasureItemMatch[1]);
-          await treasureHuntService.recordFound({
-            treasureItemId,
-            latitude: currentLocation?.latitude || 0,
-            longitude: currentLocation?.longitude || 0,
-            qrCode: data,
-          });
-          Alert.alert(
-            'Trésor trouvé ! 🏆',
-            'Vous avez découvert un objet du trésor !'
-          );
-        } else {
+        // Try to scan as treasure item QR code
+        try {
+          const result = await treasureHuntService.scanTreasureItem(data);
+
+          if (result.isNewFind) {
+            Alert.alert(
+              'Trésor trouvé ! 🏆',
+              `Vous avez découvert "${result.item.itemName}" !\n\n` +
+                `Points gagnés: +${result.pointsEarned}\n` +
+                `Progrès: ${result.totalItemsFound}/${result.totalItemsInHunt}` +
+                (result.huntComplete
+                  ? '\n\n🎉 Chasse au trésor complétée !'
+                  : '')
+            );
+          } else {
+            Alert.alert(
+              'Déjà trouvé',
+              `Vous avez déjà trouvé cet objet.\n\nProgrès: ${result.totalItemsFound}/${result.totalItemsInHunt}`
+            );
+          }
+        } catch (error: any) {
+          // Not a treasure item, might be invalid QR
           Alert.alert(
             'QR Code invalide',
             'Ce code ne correspond à aucun élément du parcours'
@@ -497,7 +730,7 @@ export const ParcoursTrackingScreen: React.FC<ParcoursTrackingScreenProps> = ({
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.loadingContainer}>
+      <SafeAreaView style={styles.loadingContainer} edges={['top', 'bottom']}>
         <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Chargement du parcours...</Text>
       </SafeAreaView>
@@ -543,10 +776,7 @@ export const ParcoursTrackingScreen: React.FC<ParcoursTrackingScreenProps> = ({
         showsMyLocationButton
         initialRegion={initialRegion}
         onMapReady={() => {
-          console.log('🗺️ Map ready!');
-          console.log('📍 PathCoordinates:', pathCoordinates.length);
-          console.log('📍 TraveledPath:', traveledPath.length);
-          console.log('📍 Parcours:', parcours?.name);
+          // Map ready
         }}
       >
         {/* Original path (remaining) */}
@@ -568,13 +798,20 @@ export const ParcoursTrackingScreen: React.FC<ParcoursTrackingScreenProps> = ({
           />
         )}
 
-        {/* POI Markers */}
+        {/* POI Markers - Hide when visited */}
         {pois.map(poi => {
+          // Don't show if already visited
+          if (visitedPOIs.has(poi.id)) {
+            return null;
+          }
+
           const lat = poi.coordinates?.latitude ?? poi.latitude;
           const lon = poi.coordinates?.longitude ?? poi.longitude;
+
           if (!lat || !lon || isNaN(Number(lat)) || isNaN(Number(lon))) {
             return null;
           }
+
           return (
             <Marker
               key={poi.id}
@@ -610,48 +847,55 @@ export const ParcoursTrackingScreen: React.FC<ParcoursTrackingScreenProps> = ({
             const isLoop =
               startCoord.latitude === destCoord.latitude &&
               startCoord.longitude === destCoord.longitude;
-
-            console.log('🟢 Start Marker:', {
-              lat: startCoord.latitude,
-              lon: startCoord.longitude,
-            });
-            console.log(
-              '🏁 Destination Marker:',
-              destCoord,
-              '- Using',
-              pathCoordinates.length > 0 ? 'path end' : 'start point'
-            );
-            console.log('🔄 Is loop route:', isLoop);
+            // FIXME
+            // console.log('🟢 Start Marker:', {
+            //   lat: startCoord.latitude,
+            //   lon: startCoord.longitude,
+            // });
+            // console.log(
+            //   '🏁 Destination Marker:',
+            //   destCoord,
+            //   '- Using',
+            //   pathCoordinates.length > 0 ? 'path end' : 'start point'
+            // );
+            // console.log('🔄 Is loop route:', isLoop);
 
             if (isLoop) {
-              // Single marker for loop routes
-              return (
-                <Marker
-                  key="start-finish"
-                  coordinate={startCoord}
-                  title="Départ / Arrivée"
-                  description={`Point de départ et d'arrivée du parcours: ${parcours.title || parcours.name}`}
-                  pinColor={colors.info}
-                />
-              );
-            } else {
-              // Separate start and finish markers
-              return (
-                <>
+              // Single marker for loop routes - hide when both start and end reached
+              if (!reachedStart && !reachedEnd) {
+                return (
                   <Marker
-                    key="start"
+                    key="start-finish"
                     coordinate={startCoord}
-                    title="Départ"
-                    description={`Point de départ du parcours: ${parcours.title || parcours.name}`}
+                    title="Départ / Arrivée"
+                    description={`Point de départ et d'arrivée du parcours: ${parcours.title || parcours.name}`}
                     pinColor={colors.info}
                   />
-                  <Marker
-                    key="finish"
-                    coordinate={destCoord}
-                    title="Arrivée"
-                    description="Point d'arrivée du parcours"
-                    pinColor={colors.success}
-                  />
+                );
+              }
+              return null;
+            } else {
+              // Separate start and finish markers - hide when reached
+              return (
+                <>
+                  {!reachedStart && (
+                    <Marker
+                      key="start"
+                      coordinate={startCoord}
+                      title="Départ"
+                      description={`Point de départ du parcours: ${parcours.title || parcours.name}`}
+                      pinColor={colors.info}
+                    />
+                  )}
+                  {!reachedEnd && (
+                    <Marker
+                      key="finish"
+                      coordinate={destCoord}
+                      title="Arrivée"
+                      description="Point d'arrivée du parcours"
+                      pinColor={colors.success}
+                    />
+                  )}
                 </>
               );
             }
@@ -701,11 +945,46 @@ export const ParcoursTrackingScreen: React.FC<ParcoursTrackingScreenProps> = ({
               );
             }
             return (
-              <View style={styles.successCard}>
-                <Text style={styles.successIcon}>✓</Text>
-                <Text style={styles.successText}>Prêt à démarrer!</Text>
-              </View>
+              <TouchableOpacity
+                style={styles.startButton}
+                onPress={handleManualStart}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.startButtonIcon}>🚀</Text>
+                <Text style={styles.startButtonText}>DÉMARRER LE PARCOURS</Text>
+              </TouchableOpacity>
             );
+          })()}
+
+        {/* Approaching Destination Warning */}
+        {hasStarted &&
+          !reachedEnd &&
+          currentLocation &&
+          originalPath.length > 0 &&
+          (() => {
+            const destination = originalPath[originalPath.length - 1];
+            const distToEnd = calculateDistance(currentLocation, destination);
+
+            // Show warning when within 100m but not yet at destination
+            if (
+              distToEnd <= 100 &&
+              distToEnd > DESTINATION_PROXIMITY_THRESHOLD
+            ) {
+              return (
+                <View style={styles.approachingCard}>
+                  <Text style={styles.approachingIcon}>🎯</Text>
+                  <View style={styles.approachingContent}>
+                    <Text style={styles.approachingTitle}>
+                      Presque arrivé !
+                    </Text>
+                    <Text style={styles.approachingText}>
+                      Plus que {distToEnd.toFixed(0)}m jusqu'à l'arrivée
+                    </Text>
+                  </View>
+                </View>
+              );
+            }
+            return null;
           })()}
 
         <View style={styles.statsCard}>
@@ -725,6 +1004,14 @@ export const ParcoursTrackingScreen: React.FC<ParcoursTrackingScreenProps> = ({
               {calculateProgress().toFixed(0)}%
             </Text>
           </View>
+          {pois.length > 0 && (
+            <View style={styles.statRow}>
+              <Text style={styles.statLabel}>📍 POIs visités</Text>
+              <Text style={styles.statValue}>
+                {visitedPOIs.size} / {pois.length}
+              </Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -746,6 +1033,28 @@ export const ParcoursTrackingScreen: React.FC<ParcoursTrackingScreenProps> = ({
           onScan={handleQRScan}
           onClose={() => setShowQRScanner(false)}
         />
+      </Modal>
+
+      {/* Podcast Player Modal */}
+      <Modal
+        visible={showPodcastPlayer && selectedPodcast !== null}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowPodcastPlayer(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {selectedPodcast && (
+              <AudioPlayer
+                podcast={selectedPodcast}
+                onClose={() => {
+                  setShowPodcastPlayer(false);
+                  setSelectedPodcast(null);
+                }}
+              />
+            )}
+          </View>
+        </View>
       </Modal>
     </SafeAreaView>
   );
@@ -853,6 +1162,61 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontWeight: 'bold',
   },
+  startButton: {
+    backgroundColor: colors.success,
+    borderRadius: 16,
+    padding: spacing.lg,
+    marginBottom: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: colors.success,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  startButtonIcon: {
+    fontSize: 24,
+    marginRight: spacing.sm,
+  },
+  startButtonText: {
+    fontSize: 16,
+    color: colors.white,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
+  },
+  approachingCard: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 12,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  approachingIcon: {
+    fontSize: 24,
+    marginRight: spacing.sm,
+  },
+  approachingContent: {
+    flex: 1,
+  },
+  approachingTitle: {
+    fontSize: 14,
+    color: colors.white,
+    fontWeight: 'bold',
+    marginBottom: spacing.xs,
+  },
+  approachingText: {
+    fontSize: 12,
+    color: colors.white,
+    opacity: 0.9,
+  },
   statsCard: {
     backgroundColor: colors.surface,
     borderRadius: 12,
@@ -906,5 +1270,16 @@ const styles = StyleSheet.create({
     color: colors.surface,
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%',
   },
 });

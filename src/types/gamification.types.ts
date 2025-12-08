@@ -1,25 +1,21 @@
 export interface Quiz {
   id: number;
-  poiId: number;
   title: string;
   description: string;
-  passingScore: number;
-  pointsReward: number;
-  timeLimit?: number;
+  difficulty: 'easy' | 'medium' | 'hard';
   isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+  creationDate: string;
+  questions?: Question[];
 }
 
 export interface Question {
   id: number;
   quizId: number;
   questionText: string;
-  questionType: 'multiple_choice' | 'true_false' | 'text';
   points: number;
   orderIndex: number;
-  createdAt: string;
-  updatedAt: string;
+  creationDate: string;
+  answers?: Answer[];
 }
 
 export interface Answer {
@@ -28,8 +24,7 @@ export interface Answer {
   answerText: string;
   isCorrect: boolean;
   orderIndex: number;
-  createdAt: string;
-  updatedAt: string;
+  creationDate: string;
 }
 
 export interface Challenge {
@@ -49,16 +44,26 @@ export interface Challenge {
 export interface TreasureHunt {
   id: number;
   parcoursId: number;
-  title: string;
-  description: string;
-  qrCode: string;
-  coordinates: Coordinates;
-  pointsReward: number;
-  startDate?: string;
-  endDate?: string;
+  name: string;
+  description?: string;
+  latitude: number;
+  longitude: number;
+  scanRadiusMeters: number;
+  qrCode?: string;
   isActive: boolean;
   createdAt: string;
-  updatedAt: string;
+  items?: TreasureItem[];
+}
+
+export interface TreasureItem {
+  id: number;
+  treasureHuntId: number;
+  itemName: string;
+  description?: string;
+  imageUrl?: string;
+  pointsValue: number;
+  qrCode: string;
+  createdAt: string;
 }
 
 export interface Reward {
@@ -71,9 +76,4 @@ export interface Reward {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
-}
-
-interface Coordinates {
-  latitude: number;
-  longitude: number;
 }

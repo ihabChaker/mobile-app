@@ -14,9 +14,18 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.mobileapp"
+      "bundleIdentifier": "com.anonymous.mobileapp",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Cette application a besoin d'accéder à la caméra pour scanner les QR codes.",
+        "NSLocationWhenInUseUsageDescription": "Cette application a besoin d'accéder à votre position pour suivre votre parcours."
+      }
     },
     "android": {
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"

@@ -134,7 +134,18 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
       });
       setShowResults(true);
     } catch (error: any) {
-      Alert.alert('Erreur', error.message || 'Impossible de soumettre le quiz');
+      Alert.alert(
+        'Erreur',
+        error.message || 'Impossible de soumettre le quiz',
+        [
+          { text: 'Réessayer', onPress: submitQuiz },
+          {
+            text: 'Quitter',
+            style: 'cancel',
+            onPress: () => navigation.goBack(),
+          },
+        ]
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -142,14 +153,27 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
-      case 'facile':
+      case 'easy':
         return colors.success;
-      case 'moyen':
+      case 'medium':
         return colors.warning;
-      case 'difficile':
+      case 'hard':
         return colors.error;
       default:
         return colors.gray500;
+    }
+  };
+
+  const getDifficultyLabel = (difficulty: string) => {
+    switch (difficulty) {
+      case 'easy':
+        return 'Facile';
+      case 'medium':
+        return 'Moyen';
+      case 'hard':
+        return 'Difficile';
+      default:
+        return difficulty;
     }
   };
 
@@ -198,7 +222,9 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
 
             <View style={styles.scoreContainer}>
               <Text style={styles.scoreValue}>{results.score}</Text>
-              <Text style={styles.scoreMax}>/ {results.maxScore}</Text>
+              <Text style={styles.scoreMax}>
+                / {results.maxScore} questions
+              </Text>
             </View>
 
             <Text style={styles.percentageText}>
@@ -276,7 +302,9 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
               { backgroundColor: getDifficultyColor(quiz.difficulty) },
             ]}
           >
-            <Text style={styles.difficultyText}>{quiz.difficulty}</Text>
+            <Text style={styles.difficultyText}>
+              {getDifficultyLabel(quiz.difficulty)}
+            </Text>
           </View>
         </View>
         <View style={styles.progressBarContainer}>

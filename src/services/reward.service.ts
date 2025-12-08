@@ -5,6 +5,8 @@ import {
   Challenge,
   UserChallenge,
   LeaderboardEntry,
+  Reward,
+  UserReward,
 } from '@/types/backend.types';
 
 /**
@@ -83,6 +85,40 @@ class RewardService {
     const response = await apiService.get<
       LeaderboardEntry[] | PaginatedResponse<LeaderboardEntry>
     >('/leaderboard/weekly');
+    return extractData(response);
+  }
+
+  /**
+   * Obtenir toutes les récompenses disponibles
+   */
+  async getAvailableRewards(): Promise<Reward[]> {
+    const response = await apiService.get<Reward[] | PaginatedResponse<Reward>>(
+      '/rewards'
+    );
+    return extractData(response);
+  }
+
+  /**
+   * Obtenir une récompense spécifique
+   */
+  async getRewardById(id: number): Promise<Reward> {
+    return apiService.get<Reward>(`/rewards/${id}`);
+  }
+
+  /**
+   * Échanger des points contre une récompense
+   */
+  async redeemReward(rewardId: number): Promise<UserReward> {
+    return apiService.post<UserReward>('/rewards/redeem', { rewardId });
+  }
+
+  /**
+   * Obtenir mes récompenses échangées
+   */
+  async getMyRedemptions(): Promise<UserReward[]> {
+    const response = await apiService.get<
+      UserReward[] | PaginatedResponse<UserReward>
+    >('/rewards/redemptions/me');
     return extractData(response);
   }
 }
