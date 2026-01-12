@@ -221,7 +221,7 @@ export const ParcoursTrackingScreen: React.FC<ParcoursTrackingScreenProps> = ({
       locationSubscription.current = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.High,
-          timeInterval: 1000, // Update every 1 second for better tracking
+          timeInterval: 500, // Update every 1 second for better tracking
           distanceInterval: 3, // Or every 3 meters for better accuracy
         },
         (location: { coords: { latitude: number; longitude: number } }) => {
@@ -989,20 +989,8 @@ export const ParcoursTrackingScreen: React.FC<ParcoursTrackingScreenProps> = ({
 
         <View style={styles.statsCard}>
           <View style={styles.statRow}>
-            <Text style={styles.statLabel}>📏 Distance</Text>
-            <Text style={styles.statValue}>
-              {(distance / 1000).toFixed(2)} km
-            </Text>
-          </View>
-          <View style={styles.statRow}>
             <Text style={styles.statLabel}>⏱️ Temps</Text>
             <Text style={styles.statValue}>{formatDuration(duration)}</Text>
-          </View>
-          <View style={styles.statRow}>
-            <Text style={styles.statLabel}>📊 Progression</Text>
-            <Text style={styles.statValue}>
-              {calculateProgress().toFixed(0)}%
-            </Text>
           </View>
           {pois.length > 0 && (
             <View style={styles.statRow}>

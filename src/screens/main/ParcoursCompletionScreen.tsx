@@ -82,12 +82,6 @@ export const ParcoursCompletionScreen: React.FC<
         {/* Stats */}
         <View style={styles.statsContainer}>
           <View style={styles.statCard}>
-            <Text style={styles.statIcon}>📏</Text>
-            <Text style={styles.statValue}>{distance.toFixed(2)} km</Text>
-            <Text style={styles.statLabel}>Distance</Text>
-          </View>
-
-          <View style={styles.statCard}>
             <Text style={styles.statIcon}>⏱️</Text>
             <Text style={styles.statValue}>{formatDuration(duration)}</Text>
             <Text style={styles.statLabel}>Durée</Text>

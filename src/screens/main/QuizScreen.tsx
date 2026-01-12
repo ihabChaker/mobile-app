@@ -239,43 +239,6 @@ export const QuizScreen: React.FC<QuizScreenProps> = ({
             </View>
           </View>
 
-          {/* Question breakdown */}
-          <View style={styles.breakdownContainer}>
-            <Text style={styles.breakdownTitle}>Détail des réponses</Text>
-            {results.questionResults.map((qr, index) => {
-              const question = questions.find(q => q.id === qr.questionId);
-              return (
-                <View key={qr.questionId} style={styles.breakdownItem}>
-                  <View
-                    style={[
-                      styles.breakdownIndicator,
-                      {
-                        backgroundColor: qr.correct
-                          ? colors.success
-                          : colors.error,
-                      },
-                    ]}
-                  />
-                  <View style={styles.breakdownContent}>
-                    <Text style={styles.breakdownQuestion} numberOfLines={2}>
-                      Q{index + 1}: {question?.questionText || 'Question'}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.breakdownResult,
-                        { color: qr.correct ? colors.success : colors.error },
-                      ]}
-                    >
-                      {qr.correct
-                        ? `✓ Correct (+${qr.points} pts)`
-                        : '✗ Incorrect'}
-                    </Text>
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-
           <TouchableOpacity
             style={styles.finishButton}
             onPress={() => navigation.goBack()}
